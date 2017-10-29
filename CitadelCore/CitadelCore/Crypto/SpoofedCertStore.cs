@@ -49,11 +49,6 @@ namespace CitadelCore.Crypto
         private X509Certificate m_caCertificate;
 
         /// <summary>
-        /// Used for synchronization only where absolutely required. 
-        /// </summary>
-        private object m_caSignerLock = new object();
-
-        /// <summary>
         /// Constructs a new certificate store instance. 
         /// </summary>
         public SpoofedCertStore()
@@ -111,11 +106,7 @@ namespace CitadelCore.Crypto
 
             certGen.SetPublicKey(fkp.Public);
 
-            X509Certificate cert = null;
-            lock(m_caSignerLock)
-            {
-                cert = certGen.Generate(m_caSigner);
-            }
+            X509Certificate cert = certGen.Generate(m_caSigner);
 
             var converted = cert.ConvertFromBouncyCastle(fkp);
 
