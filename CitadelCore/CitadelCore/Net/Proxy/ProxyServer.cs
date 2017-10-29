@@ -257,10 +257,15 @@ namespace CitadelCore.Net.Proxy
 
             ListenOptions httpListenOptions = null;
             ListenOptions httpsListenOptions = null;
-            
+
+            ipWebhostBuilder.UseLibuv(opts =>
+            {
+                opts.ThreadCount = Environment.ProcessorCount;
+            });
+
             // Use Kestrel server.
             ipWebhostBuilder.UseKestrel(opts =>
-            {
+            {   
                 // Listen for HTTPS connections. Keep a reference to the options object so we can get
                 // the chosen port number after we call start.
                 opts.Listen(isV6 ? IPAddress.IPv6Any : IPAddress.Any, 0, listenOpts =>
