@@ -71,15 +71,22 @@ namespace CitadelCore.Logging
         /// The message. 
         /// </param>
         /// <param name="callerName">
-        /// Courtesy of compiler services, the name of the function from which this method was invoked.
+        /// Courtesy of compiler services, the name of the function from which this method was invoked. 
         /// </param>
         /// <param name="callerFilePath">
-        /// Courtesy of compiler services, the source file containing the function from which this method was invoked.
+        /// Courtesy of compiler services, the source file containing the function from which this
+        /// method was invoked.
         /// </param>
         /// <param name="callerSourceLineNumber">
-        /// Courtesy of compiler services, the line number in the source file from which this method was invoked.
+        /// Courtesy of compiler services, the line number in the source file from which this method
+        /// was invoked.
         /// </param>
-        internal void Info(string msg, [CallerMemberName] string callerName = "", [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerSourceLineNumber = 0)
+        /// <remarks>
+        /// Though this is a public function, this is designed to be used by plugins or other such
+        /// things extending classes in this binary. Unfortunately this last minute design change has
+        /// forced us to make this public.
+        /// </remarks>
+        public void Info(string msg, [CallerMemberName] string callerName = "", [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerSourceLineNumber = 0)
         {
             var formatted = string.Format("{0}\t {2}::{1}() #{3}", msg, callerName, Path.GetFileName(callerFilePath), callerSourceLineNumber);
             OnInfo?.Invoke(formatted);
@@ -100,7 +107,12 @@ namespace CitadelCore.Logging
         /// <param name="callerSourceLineNumber">
         /// Courtesy of compiler services, the line number in the source file from which this method was invoked.
         /// </param>
-        internal void Warn(string msg, [CallerMemberName] string callerName = "", [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerSourceLineNumber = 0)
+        /// <remarks>
+        /// Though this is a public function, this is designed to be used by plugins or other such
+        /// things extending classes in this binary. Unfortunately this last minute design change has
+        /// forced us to make this public.
+        /// </remarks>
+        public void Warn(string msg, [CallerMemberName] string callerName = "", [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerSourceLineNumber = 0)
         {
             var formatted = string.Format("{0}\t {2}::{1}() #{3}", msg, callerName, Path.GetFileName(callerFilePath), callerSourceLineNumber);
             OnWarning?.Invoke(formatted);
@@ -121,7 +133,12 @@ namespace CitadelCore.Logging
         /// <param name="callerSourceLineNumber">
         /// Courtesy of compiler services, the line number in the source file from which this method was invoked.
         /// </param>
-        internal void Error(string msg, [CallerMemberName] string callerName = "", [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerSourceLineNumber = 0)
+        /// <remarks>
+        /// Though this is a public function, this is designed to be used by plugins or other such
+        /// things extending classes in this binary. Unfortunately this last minute design change has
+        /// forced us to make this public.
+        /// </remarks>
+        public void Error(string msg, [CallerMemberName] string callerName = "", [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerSourceLineNumber = 0)
         {
             var formatted = string.Format("{0}\t {2}::{1}() #{3}", msg, callerName, Path.GetFileName(callerFilePath), callerSourceLineNumber);
             OnError?.Invoke(formatted);
@@ -145,7 +162,12 @@ namespace CitadelCore.Logging
         /// Courtesy of compiler services, the line number in the source file from which this method
         /// was invoked.
         /// </param>
-        internal void Error(Exception e, [CallerMemberName] string callerName = "", [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerSourceLineNumber = 0)
+        /// <remarks>
+        /// Though this is a public function, this is designed to be used by plugins or other such
+        /// things extending classes in this binary. Unfortunately this last minute design change has
+        /// forced us to make this public.
+        /// </remarks>
+        public void Error(Exception e, [CallerMemberName] string callerName = "", [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerSourceLineNumber = 0)
         {
             var b = new StringBuilder();
             while(e != null)

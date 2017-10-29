@@ -13,7 +13,7 @@ namespace CitadelCore.Extensions
     /// IPAddressExtensions provides some convenience functions, such as the ability to more
     /// accurately determine if an IP address is private.
     /// </summary>
-    internal static class IPAddressExtensions
+    public static class IPAddressExtensions
     {
         /// <summary>
         /// Determines whether or not the address is an IPV4 private address. 
