@@ -12,8 +12,9 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/TechnikEmpire/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Initial release.</PackageReleaseNotes>
-    <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>    
+    <PackageReleaseNotes>Remove unnecessary locking mechanism from certificate spoofer.</PackageReleaseNotes>
+    <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
+    <Version>1.1.0</Version>    
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
