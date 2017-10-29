@@ -14,7 +14,7 @@
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
     <PackageReleaseNotes>Remove unnecessary locking mechanism from certificate spoofer.</PackageReleaseNotes>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>1.1.2</Version>    
+    <Version>1.1.4</Version>    
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

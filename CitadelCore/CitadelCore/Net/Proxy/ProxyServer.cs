@@ -176,7 +176,12 @@ namespace CitadelCore.Net.Proxy
                     CreateHost(true)
                 };
 
-                m_diverter = CreateDiverter();
+                m_diverter = CreateDiverter(
+                        m_v4HttpListenerEp,
+                        m_v4HttpsListenerEp,
+                        m_v6HttpListenerEp,
+                        m_v6HttpsListenerEp
+                    );
 
                 m_diverter.ConfirmDenyFirewallAccess = (procPath) =>
                 {
@@ -192,10 +197,22 @@ namespace CitadelCore.Net.Proxy
         /// <summary>
         /// Internal call to create the platform specific packet diverter. 
         /// </summary>
+        /// <param name="ipv4HttpEp">
+        /// The endpoint where the proxy is listening for IPV4 HTTP connections. 
+        /// </param>
+        /// <param name="ipv4HttpsEp">
+        /// The endpoint where the proxy is listening for IPV4 HTTPS connections. 
+        /// </param>
+        /// <param name="ipv6HttpEp">
+        /// The endpoint where the proxy is listening for IPV6 HTTP connections. 
+        /// </param>
+        /// <param name="ipv6HttpsEp">
+        /// The endpoint where the proxy is listening for IPV6 HTTPS connections. 
+        /// </param>
         /// <returns>
-        /// The platform specific diverter.
+        /// The platform specific diverter. 
         /// </returns>
-        protected abstract IDiverter CreateDiverter();
+        protected abstract IDiverter CreateDiverter(IPEndPoint ipv4HttpEp, IPEndPoint ipv4HttpsEp, IPEndPoint ipv6HttpEp, IPEndPoint ipv6HttpsEp);
 
         /// <summary>
         /// Stops any running proxy server listeners and allows them to be disposed. 

@@ -5,21 +5,10 @@
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+using CitadelCore.Net.Proxy;
+
 namespace CitadelCore.Diversion
 {
-
-    /// <summary>
-    /// Delegate used to check if a binary at a specified path should or should not have its traffic
-    /// diverted through the proxy.
-    /// </summary>
-    /// <param name="binaryAbsolutePath">
-    /// Absolute path to the binary in question.
-    /// </param>
-    /// <returns>
-    /// True if the binary's traffic should be filtered, false otherwise.
-    /// </returns>
-    public delegate bool FirewallCheckCallback(string binaryAbsolutePath);
-
     /// <summary>
     /// Defines the interface for a platform-specific packet diverter. 
     /// </summary>
