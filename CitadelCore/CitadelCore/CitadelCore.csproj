@@ -14,10 +14,27 @@
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
     <PackageReleaseNotes>Remove unnecessary locking mechanism from certificate spoofer.</PackageReleaseNotes>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>1.2.0</Version>
-    <AssemblyVersion>1.2.0.0</AssemblyVersion>
-    <FileVersion>1.2.0.0</FileVersion>    
+    <Version>1.2.4</Version>
+    <AssemblyVersion>1.2.4.0</AssemblyVersion>
+    <FileVersion>1.2.4.0</FileVersion>    
   </PropertyGroup>
+
+  <ItemGroup Label="dotnet pack instructions">
+    <Content Include="build\*.targets">
+      <Pack>true</Pack>
+      <PackagePath>build\</PackagePath>
+    </Content>
+  </ItemGroup>
+
+  <Target Name="CollectRuntimeOutputs" BeforeTargets="_GetPackageFiles">
+    <!-- Collect these items inside a target that runs after build but before packaging. -->
+    <ItemGroup>
+      <Content Include="$(OutputPath)\*.pdb;">
+        <Pack>true</Pack>
+        <PackagePath>build\</PackagePath>
+      </Content>
+    </ItemGroup>
+  </Target>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
