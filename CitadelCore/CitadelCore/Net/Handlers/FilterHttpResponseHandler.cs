@@ -300,9 +300,9 @@ namespace CitadelCore.Net.Handlers
                     string responseBlockResponseContentType = string.Empty;
                     byte[] responseBlockResponse = null;
 
-                    m_msgBeginCb?.Invoke(reqUrl, resHeaderBuilder.ToString(), m_nullBody, context.Request.IsHttps ? MessageType.Https : MessageType.Http, MessageDirection.Request, out responseNextAction, out responseBlockResponseContentType, out responseBlockResponse);
+                    m_msgBeginCb?.Invoke(reqUrl, resHeaderBuilder.ToString(), m_nullBody, context.Request.IsHttps ? MessageType.Https : MessageType.Http, MessageDirection.Response, out responseNextAction, out responseBlockResponseContentType, out responseBlockResponse);
 
-                    if(requestNextAction == ProxyNextAction.DropConnection)
+                    if(responseNextAction == ProxyNextAction.DropConnection)
                     {
                         if(responseBlockResponse != null)
                         {
@@ -318,7 +318,7 @@ namespace CitadelCore.Net.Handlers
                         }
                     }
 
-                    if(requestNextAction == ProxyNextAction.AllowButRequestContentInspection)
+                    if(responseNextAction == ProxyNextAction.AllowButRequestContentInspection)
                     {
                         using(var upstreamResponseStream = await response.Content.ReadAsStreamAsync())
                         {
@@ -337,7 +337,7 @@ namespace CitadelCore.Net.Handlers
                                 bool shouldBlockResponse = false;
                                 responseBlockResponseContentType = string.Empty;
                                 responseBlockResponse = null;
-                                m_msgEndCb?.Invoke(reqUrl, reqHeaderBuilder.ToString(), responseBody, context.Request.IsHttps ? MessageType.Https : MessageType.Http, MessageDirection.Request, out shouldBlockResponse, out responseBlockResponseContentType, out responseBlockResponse);
+                                m_msgEndCb?.Invoke(reqUrl, resHeaderBuilder.ToString(), responseBody, context.Request.IsHttps ? MessageType.Https : MessageType.Http, MessageDirection.Response, out shouldBlockResponse, out responseBlockResponseContentType, out responseBlockResponse);
 
                                 if(shouldBlockResponse)
                                 {
