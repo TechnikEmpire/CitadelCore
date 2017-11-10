@@ -389,6 +389,7 @@ namespace CitadelCore.Net.Handlers
         private void Do204(HttpContext context)
         {
             context.Response.StatusCode = 204;
+            context.Response.Headers.Remove("Expires");
             context.Response.Headers.Add("Expires", new Microsoft.Extensions.Primitives.StringValues(s_EpochHttpDateTime));
             return;
         }
@@ -414,7 +415,8 @@ namespace CitadelCore.Net.Handlers
             {
                 ms.Position = 0;
                 context.Response.StatusCode = 200;
-                context.Response.Headers.Add("Expires", new Microsoft.Extensions.Primitives.StringValues(s_EpochHttpDateTime));
+                context.Response.Headers.Remove("Expires");
+                context.Response.Headers.Add("Expires", new Microsoft.Extensions.Primitives.StringValues(s_EpochHttpDateTime));                
                 context.Response.ContentType = contentType;
                 await ms.CopyToAsync(context.Response.Body, 81920, context.RequestAborted);
                 return;
