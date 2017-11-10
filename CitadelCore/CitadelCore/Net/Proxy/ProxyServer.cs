@@ -257,7 +257,7 @@ namespace CitadelCore.Net.Proxy
 
             ListenOptions httpListenOptions = null;
             ListenOptions httpsListenOptions = null;
-
+            
             ipWebhostBuilder.UseLibuv(opts =>
             {
                 opts.ThreadCount = Environment.ProcessorCount;
@@ -265,7 +265,11 @@ namespace CitadelCore.Net.Proxy
 
             // Use Kestrel server.
             ipWebhostBuilder.UseKestrel(opts =>
-            {   
+            {
+
+                opts.Limits.MaxRequestBodySize = null;
+                opts.Limits.MaxRequestBufferSize = null;
+                
                 // Listen for HTTPS connections. Keep a reference to the options object so we can get
                 // the chosen port number after we call start.
                 opts.Listen(isV6 ? IPAddress.IPv6Any : IPAddress.Any, 0, listenOpts =>
@@ -330,7 +334,7 @@ namespace CitadelCore.Net.Proxy
             {
                 // We proxy websockets, so enable this.
                 app.UseWebSockets();
-
+                
                 // Exception handler. Not yet sure what to do here.
                 app.UseExceptionHandler(
                     options =>
@@ -352,13 +356,13 @@ namespace CitadelCore.Net.Proxy
                         );
                     }
                 );
-
+                
                 // Global request handler. Terminates middleware, aka this is the final handler and
                 // middleware will come before this. In the end, we simply ask our factory to give us
                 // the appropriate handler given what the context us, and then let it return a task
                 // we give back to kestrel to see through.
                 app.Run(context =>
-                {
+                {   
                     return Task.Run(async () =>
                     {
                         var handler = FilterResponseHandlerFactory.Default.GetHandler(context);

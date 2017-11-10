@@ -80,14 +80,16 @@ namespace CitadelCore.Net.ConnectionAdapters
 
                     try
                     {
-                        var sslStream = new SslStream(yourClientStream, false,
+                        var sslStream = new SslStream(yourClientStream, true,
                             (object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors) =>
                             {
                                 // TODO - Handle client certificates. They should be pushed to the
                                 // upstream connection eventually.
                                 if(certificate != null)
                                 {
+                                    LoggerProxy.Default.Info("CLIENT CERTIFICATE AVAILABLE!!!!!!!!!!!!!");
                                 }
+
                                 return true;
                             }
                             );

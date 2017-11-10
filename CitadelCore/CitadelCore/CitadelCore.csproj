@@ -12,11 +12,11 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/TechnikEmpire/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Remove unnecessary locking mechanism from certificate spoofer.</PackageReleaseNotes>
+    <PackageReleaseNotes>Fixes several issues. See github release for more details.</PackageReleaseNotes>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>1.2.4</Version>
-    <AssemblyVersion>1.2.4.0</AssemblyVersion>
-    <FileVersion>1.2.4.0</FileVersion>    
+    <Version>1.2.12</Version>
+    <AssemblyVersion>1.2.12.0</AssemblyVersion>
+    <FileVersion>1.2.12.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">

@@ -13,6 +13,7 @@ using CitadelCore.Net.Proxy;
 using CitadelCore.Logging;
 using System.Text;
 using System.Threading;
+using CitadelCore.Net.Http;
 
 namespace CitadelCore.Net.Handlers
 {
@@ -71,10 +72,10 @@ namespace CitadelCore.Net.Handlers
             foreach(var cookie in context.Request.Cookies)
             {
                 LoggerProxy.Default.Info(string.Format("Adding websocket cookie {0}={1}", cookie.Key, cookie.Value));
-
+                
                 try
-                {
-                    wsServer.Options.Cookies.Add(new System.Net.Cookie(cookie.Key, cookie.Value));
+                {   
+                    wsServer.Options.Cookies.Add(new System.Net.Cookie(cookie.Key, cookie.Value, "/", wsUri.Host));
                 }
                 catch(Exception e)
                 {
@@ -109,7 +110,10 @@ namespace CitadelCore.Net.Handlers
             var reqHeaderBuilder = new StringBuilder();
             foreach(var hdr in context.Request.Headers)
             {
-                reqHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, hdr.Value.ToString());
+                if(!ForbiddenHttpHeaders.IsForbidden(hdr.Key))
+                {
+                    reqHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, hdr.Value.ToString());
+                }
             }
 
             reqHeaderBuilder.Append("\r\n");

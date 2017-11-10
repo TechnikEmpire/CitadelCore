@@ -16,6 +16,7 @@ using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Security;
 using Org.BouncyCastle.Utilities;
 using Org.BouncyCastle.X509;
+using Org.BouncyCastle.X509.Extension;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -87,7 +88,7 @@ namespace CitadelCore.Crypto
             certGen.SetNotBefore(DateTime.Now);
             certGen.SetNotAfter(DateTime.Now.AddYears(1));
             certGen.SetSubjectDN(dnName);
-
+            
             var certificatePermissions = new List<KeyPurposeID>()
             {
                  KeyPurposeID.IdKPServerAuth
@@ -105,6 +106,9 @@ namespace CitadelCore.Crypto
             var fkp = kpg.GenerateKeyPair();
 
             certGen.SetPublicKey(fkp.Public);
+
+            certGen.AddExtension(X509Extensions.AuthorityKeyIdentifier, false, new AuthorityKeyIdentifierStructure(m_caCertificate));
+            certGen.AddExtension(X509Extensions.SubjectKeyIdentifier, false, new SubjectKeyIdentifierStructure(fkp.Public));
 
             X509Certificate cert = certGen.Generate(m_caSigner);
 
@@ -147,7 +151,11 @@ namespace CitadelCore.Crypto
             certGen.SetIssuerDN(dnName);
             certGen.SetNotBefore(startDate);
             certGen.SetNotAfter(expiryDate);
-            certGen.AddExtension(Org.BouncyCastle.Asn1.X509.X509Extensions.ExtendedKeyUsage, false, new ExtendedKeyUsage(certificatePermissions));
+
+            certGen.AddExtension(Org.BouncyCastle.Asn1.X509.X509Extensions.ExtendedKeyUsage, false, new ExtendedKeyUsage(certificatePermissions));            
+            certGen.AddExtension(X509Extensions.SubjectKeyIdentifier, false, new SubjectKeyIdentifierStructure(m_caKeypair.Public));
+            
+            certGen.AddExtension(Org.BouncyCastle.Asn1.X509.X509Extensions.BasicConstraints, false, new BasicConstraints(true));
 
             // Note that because we're self signing, our subject and issuer names are the same.
             certGen.SetSubjectDN(dnName);
