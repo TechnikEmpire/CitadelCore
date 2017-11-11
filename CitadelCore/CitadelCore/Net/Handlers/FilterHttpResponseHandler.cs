@@ -128,14 +128,14 @@ namespace CitadelCore.Net.Handlers
                     {
                         // User wants to block this request with a custom response.
                         await DoCustomResponse(context, requestBlockResponseContentType, requestBlockResponse);
-                        return;
                     }
                     else
                     {
                         // User wants to block this request with a generic 204 response.
-                        Do204(context);
-                        return;
+                        Do204(context);                        
                     }
+
+                    return;
                 }
 
                 // Get the request body into memory.
@@ -153,7 +153,7 @@ namespace CitadelCore.Net.Handlers
 
                     // If we don't have a body, there's no sense in calling the message end callback.
                     if(requestBody.Length > 0)
-                    {
+                    {   
                         // We have a body and the user previously instructed us to give them the
                         // content, if any, for inspection.
                         if(requestNextAction == ProxyNextAction.AllowButRequestContentInspection)
@@ -171,15 +171,15 @@ namespace CitadelCore.Net.Handlers
                                 if(requestBlockResponse != null)
                                 {
                                     // User wants to block this request with a custom response.
-                                    await DoCustomResponse(context, requestBlockResponseContentType, requestBlockResponse);
-                                    return;
+                                    await DoCustomResponse(context, requestBlockResponseContentType, requestBlockResponse);                                    
                                 }
                                 else
                                 {
                                     // User wants to block this request with a generic 204 response.
-                                    Do204(context);
-                                    return;
+                                    Do204(context);                                    
                                 }
+
+                                return;
                             }
                         }
 
@@ -245,16 +245,6 @@ namespace CitadelCore.Net.Handlers
                     {
                         continue;
                     }
-                    /*
-                    if(hdr.Key.IndexOf("Transfer-Encoding", StringComparison.OrdinalIgnoreCase) != -1)
-                    {
-                        // No. This is handled for us automatically by both the proxy client and
-                        // kestrel server. One end will automatically decode this for us, and the
-                        // other end will automatically encode this way for us, so we simply ensure
-                        // that we don't copy this header over.
-                        continue;
-                    }
-                    */
 
                     try
                     {
@@ -273,13 +263,6 @@ namespace CitadelCore.Net.Handlers
                     {
                         continue;
                     }
-                    /*
-                    if(hdr.Key.IndexOf("Transfer-Encoding", StringComparison.OrdinalIgnoreCase) != -1)
-                    {
-                        // See notes above. Probably not necessary here or there or who really cares.
-                        continue;
-                    }
-                    */
 
                     try
                     {
@@ -307,14 +290,12 @@ namespace CitadelCore.Net.Handlers
                         if(responseBlockResponse != null)
                         {
                             // User wants to block this response with a custom response.
-                            await DoCustomResponse(context, responseBlockResponseContentType, responseBlockResponse);
-                            return;
+                            await DoCustomResponse(context, responseBlockResponseContentType, responseBlockResponse);                            
                         }
                         else
                         {
                             // User wants to block this response with a generic 204 response.
-                            Do204(context);
-                            return;
+                            Do204(context);                            
                         }
                     }
 
@@ -345,14 +326,14 @@ namespace CitadelCore.Net.Handlers
                                     {
                                         // User wants to block this response with a custom response.
                                         await DoCustomResponse(context, responseBlockResponseContentType, responseBlockResponse);
-                                        return;
                                     }
                                     else
                                     {
                                         // User wants to block this response with a generic 204 response.
                                         Do204(context);
-                                        return;
                                     }
+
+                                    return;
                                 }
 
                                 // User inspected but allowed the content. Just write to the response
@@ -388,10 +369,9 @@ namespace CitadelCore.Net.Handlers
         /// </param>
         private void Do204(HttpContext context)
         {
-            context.Response.StatusCode = 204;
-            context.Response.Headers.Remove("Expires");
+            context.Response.Headers.Clear();
+            context.Response.StatusCode = 204;            
             context.Response.Headers.Add("Expires", new Microsoft.Extensions.Primitives.StringValues(s_EpochHttpDateTime));
-            return;
         }
 
         /// <summary>
@@ -414,12 +394,11 @@ namespace CitadelCore.Net.Handlers
             using(var ms = new MemoryStream(customResponseBody))
             {
                 ms.Position = 0;
-                context.Response.StatusCode = 200;
-                context.Response.Headers.Remove("Expires");
+                context.Response.Headers.Clear();
+                context.Response.StatusCode = 200;                
                 context.Response.Headers.Add("Expires", new Microsoft.Extensions.Primitives.StringValues(s_EpochHttpDateTime));                
                 context.Response.ContentType = contentType;
-                await ms.CopyToAsync(context.Response.Body, 81920, context.RequestAborted);
-                return;
+                await ms.CopyToAsync(context.Response.Body, 81920, context.RequestAborted);                
             }
         }
     }
