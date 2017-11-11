@@ -338,7 +338,15 @@ namespace CitadelCore.Net.Handlers
 
                                 // User inspected but allowed the content. Just write to the response
                                 // body and then move on with your life fam.
-                                await context.Response.Body.WriteAsync(responseBody, 0, responseBody.Length);
+                                //
+                                // However, don't try to write a body if it's zero length. Also, do not try
+                                // to write a body, even  if present, if the status is 204. Kestrel will not
+                                // let us do this, and so far I can't find a way to remove this technically correct
+                                // strict-compliance.
+                                if(responseBody.Length > 0 && context.Response.StatusCode != 204)
+                                {
+                                    await context.Response.Body.WriteAsync(responseBody, 0, responseBody.Length);
+                                }
 
                                 // Ensure we exit here, because if we fall past this scope then the
                                 // response is going to get mangled.
