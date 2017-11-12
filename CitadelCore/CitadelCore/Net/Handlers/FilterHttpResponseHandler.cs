@@ -365,7 +365,11 @@ namespace CitadelCore.Net.Handlers
             }
             catch(Exception e)
             {
-                LoggerProxy.Default.Error(e);
+                if(!(e is TaskCanceledException))
+                {
+                    // Ignore task cancelled exceptions.
+                    LoggerProxy.Default.Error(e);
+                }
             }
         }
 

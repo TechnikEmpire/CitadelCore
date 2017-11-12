@@ -32,7 +32,7 @@ namespace CitadelCore.Crypto
         /// <summary>
         /// Dictionary that keeps all generated, cloned certificates issued by our fake CA. 
         /// </summary>
-        private ConcurrentDictionary<string, System.Security.Cryptography.X509Certificates.X509Certificate2> m_certificates = new ConcurrentDictionary<string, System.Security.Cryptography.X509Certificates.X509Certificate2>();
+        private Dictionary<string, System.Security.Cryptography.X509Certificates.X509Certificate2> m_certificates = new Dictionary<string, System.Security.Cryptography.X509Certificates.X509Certificate2>();
 
         /// <summary>
         /// Our CA keypair for signing. 
@@ -48,6 +48,8 @@ namespace CitadelCore.Crypto
         /// Our actual CA certificate. 
         /// </summary>
         private X509Certificate m_caCertificate;
+
+        private object m_genLock = new object();
 
         /// <summary>
         /// Constructs a new certificate store instance. 
@@ -68,55 +70,58 @@ namespace CitadelCore.Crypto
         /// A DV certificate for the specified host. 
         /// </returns>
         public System.Security.Cryptography.X509Certificates.X509Certificate2 GetSpoofedCertificateForHost(string host)
-        {
-            System.Security.Cryptography.X509Certificates.X509Certificate2 cloned = null;
-
-            if(m_certificates.TryGetValue(host, out cloned))
+        {   
+            lock(m_genLock)
             {
-                return cloned;
+                System.Security.Cryptography.X509Certificates.X509Certificate2 cloned = null;
+
+                if(m_certificates.TryGetValue(host, out cloned))
+                {
+                    return cloned;
+                }
+
+                var certGen = new X509V3CertificateGenerator();
+
+                var serialRandomGen = new CryptoApiRandomGenerator();
+                var serialRandom = new SecureRandom(serialRandomGen);
+                var serialNumber = BigIntegers.CreateRandomInRange(BigInteger.One, BigInteger.ValueOf(Int64.MaxValue), serialRandom);
+
+                X509Name dnName = new X509Name(string.Format("CN={0}", host));
+                certGen.SetSerialNumber(serialNumber);
+                certGen.SetIssuerDN(m_caCertificate.SubjectDN);
+                certGen.SetNotBefore(DateTime.Now);
+                certGen.SetNotAfter(DateTime.Now.AddYears(1));
+                certGen.SetSubjectDN(dnName);
+
+                var certificatePermissions = new List<KeyPurposeID>()
+                {
+                     KeyPurposeID.IdKPServerAuth
+                };
+
+                certGen.AddExtension(Org.BouncyCastle.Asn1.X509.X509Extensions.ExtendedKeyUsage, false, new ExtendedKeyUsage(certificatePermissions));
+
+                var subjectAlternativeNamesExtension = new DerSequence(new[] { host }.Select(name => new GeneralName(GeneralName.DnsName, name)).ToArray<Asn1Encodable>());
+
+                certGen.AddExtension(X509Extensions.SubjectAlternativeName.Id, false, subjectAlternativeNamesExtension);
+
+                var kpg = new ECKeyPairGenerator();
+                kpg.Init(new KeyGenerationParameters(new SecureRandom(), 256));
+
+                var fkp = kpg.GenerateKeyPair();
+
+                certGen.SetPublicKey(fkp.Public);
+
+                certGen.AddExtension(X509Extensions.AuthorityKeyIdentifier, false, new AuthorityKeyIdentifierStructure(m_caCertificate));
+                certGen.AddExtension(X509Extensions.SubjectKeyIdentifier, false, new SubjectKeyIdentifierStructure(fkp.Public));
+
+                X509Certificate cert = certGen.Generate(m_caSigner);
+
+                var converted = cert.ConvertFromBouncyCastle(fkp);
+
+                m_certificates.Add(host, converted);
+
+                return converted;
             }
-
-            var certGen = new X509V3CertificateGenerator();
-
-            var serialRandomGen = new CryptoApiRandomGenerator();
-            var serialRandom = new SecureRandom(serialRandomGen);
-            var serialNumber = BigIntegers.CreateRandomInRange(BigInteger.One, BigInteger.ValueOf(Int64.MaxValue), serialRandom);
-
-            X509Name dnName = new X509Name(string.Format("CN={0}", host));
-            certGen.SetSerialNumber(serialNumber);
-            certGen.SetIssuerDN(m_caCertificate.SubjectDN);
-            certGen.SetNotBefore(DateTime.Now);
-            certGen.SetNotAfter(DateTime.Now.AddYears(1));
-            certGen.SetSubjectDN(dnName);
-            
-            var certificatePermissions = new List<KeyPurposeID>()
-            {
-                 KeyPurposeID.IdKPServerAuth
-            };
-
-            certGen.AddExtension(Org.BouncyCastle.Asn1.X509.X509Extensions.ExtendedKeyUsage, false, new ExtendedKeyUsage(certificatePermissions));
-
-            var subjectAlternativeNamesExtension = new DerSequence(new[] { host }.Select(name => new GeneralName(GeneralName.DnsName, name)).ToArray<Asn1Encodable>());
-
-            certGen.AddExtension(X509Extensions.SubjectAlternativeName.Id, false, subjectAlternativeNamesExtension);
-
-            var kpg = new ECKeyPairGenerator();
-            kpg.Init(new KeyGenerationParameters(new SecureRandom(), 256));
-
-            var fkp = kpg.GenerateKeyPair();
-
-            certGen.SetPublicKey(fkp.Public);
-
-            certGen.AddExtension(X509Extensions.AuthorityKeyIdentifier, false, new AuthorityKeyIdentifierStructure(m_caCertificate));
-            certGen.AddExtension(X509Extensions.SubjectKeyIdentifier, false, new SubjectKeyIdentifierStructure(fkp.Public));
-
-            X509Certificate cert = certGen.Generate(m_caSigner);
-
-            var converted = cert.ConvertFromBouncyCastle(fkp);
-
-            m_certificates.GetOrAdd(host, converted);
-
-            return converted;
         }
 
         /// <summary>
