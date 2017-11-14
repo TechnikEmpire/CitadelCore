@@ -89,16 +89,18 @@ namespace CitadelCore.Crypto
                 X509Name dnName = new X509Name(string.Format("CN={0}", host));
                 certGen.SetSerialNumber(serialNumber);
                 certGen.SetIssuerDN(m_caCertificate.SubjectDN);
-                certGen.SetNotBefore(DateTime.Now);
-                certGen.SetNotAfter(DateTime.Now.AddYears(1));
+                certGen.SetNotBefore(DateTime.Now.AddYears(-1).ToUniversalTime());
+                certGen.SetNotAfter(DateTime.Now.AddYears(2).ToUniversalTime());
                 certGen.SetSubjectDN(dnName);
 
+                /*
                 var certificatePermissions = new List<KeyPurposeID>()
                 {
                      KeyPurposeID.IdKPServerAuth
-                };
+                };               
 
                 certGen.AddExtension(Org.BouncyCastle.Asn1.X509.X509Extensions.ExtendedKeyUsage, false, new ExtendedKeyUsage(certificatePermissions));
+                */
 
                 var subjectAlternativeNamesExtension = new DerSequence(new[] { host }.Select(name => new GeneralName(GeneralName.DnsName, name)).ToArray<Asn1Encodable>());
 
@@ -110,7 +112,7 @@ namespace CitadelCore.Crypto
                 var fkp = kpg.GenerateKeyPair();
 
                 certGen.SetPublicKey(fkp.Public);
-
+                
                 certGen.AddExtension(X509Extensions.AuthorityKeyIdentifier, false, new AuthorityKeyIdentifierStructure(m_caCertificate));
                 certGen.AddExtension(X509Extensions.SubjectKeyIdentifier, false, new SubjectKeyIdentifierStructure(fkp.Public));
 
@@ -136,20 +138,22 @@ namespace CitadelCore.Crypto
 
             m_caSigner = new Asn1SignatureFactory("SHA256withECDSA", m_caKeypair.Private);
 
-            DateTime startDate = DateTime.Now;
-            DateTime expiryDate = DateTime.Now.AddYears(1);
+            DateTime startDate = DateTime.Now.AddYears(-1).ToUniversalTime();
+            DateTime expiryDate = DateTime.Now.AddYears(2).ToUniversalTime();
             BigInteger serialNumber = BigInteger.ProbablePrime(256, new Random());
 
             var certGen = new X509V3CertificateGenerator();
 
+            /*
             var certificatePermissions = new List<KeyPurposeID>()
             {
                  KeyPurposeID.IdKPCodeSigning,
                  KeyPurposeID.IdKPServerAuth,
                  KeyPurposeID.IdKPTimeStamping,
-                 KeyPurposeID.IdKPOcspSigning,
+                 KeyPurposeID.IdKPOcspSigning,                 
                  KeyPurposeID.IdKPClientAuth
             };
+            */
 
             X509Name dnName = new X509Name("CN=Citadel Core");
             certGen.SetSerialNumber(serialNumber);
@@ -157,9 +161,10 @@ namespace CitadelCore.Crypto
             certGen.SetNotBefore(startDate);
             certGen.SetNotAfter(expiryDate);
 
-            certGen.AddExtension(Org.BouncyCastle.Asn1.X509.X509Extensions.ExtendedKeyUsage, false, new ExtendedKeyUsage(certificatePermissions));            
+            //certGen.AddExtension(Org.BouncyCastle.Asn1.X509.X509Extensions.ExtendedKeyUsage, false, new ExtendedKeyUsage(certificatePermissions));            
             certGen.AddExtension(X509Extensions.SubjectKeyIdentifier, false, new SubjectKeyIdentifierStructure(m_caKeypair.Public));
-            
+            certGen.AddExtension(X509Extensions.KeyUsage, true, new KeyUsage(KeyUsage.CrlSign | KeyUsage.KeyCertSign));
+
             certGen.AddExtension(Org.BouncyCastle.Asn1.X509.X509Extensions.BasicConstraints, false, new BasicConstraints(true));
 
             // Note that because we're self signing, our subject and issuer names are the same.

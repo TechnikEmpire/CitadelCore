@@ -252,7 +252,14 @@ namespace CitadelCore.Net.Handlers
                     }
                     catch { }
 
-                    context.Response.Headers.Add(hdr.Key, new Microsoft.Extensions.Primitives.StringValues(hdr.Value.ToArray()));
+                    try
+                    {
+                        context.Response.Headers.Add(hdr.Key, new Microsoft.Extensions.Primitives.StringValues(hdr.Value.ToArray()));
+                    }
+                    catch(Exception e)
+                    {
+                        LoggerProxy.Default.Error(e);
+                    }
                 }
 
                 // As mentioned above, headers are split up into different properties. We need to now
@@ -270,7 +277,14 @@ namespace CitadelCore.Net.Handlers
                     }
                     catch { }
 
-                    context.Response.Headers.Add(hdr.Key, new Microsoft.Extensions.Primitives.StringValues(hdr.Value.ToArray()));
+                    try
+                    {
+                        context.Response.Headers.Add(hdr.Key, new Microsoft.Extensions.Primitives.StringValues(hdr.Value.ToArray()));
+                    }
+                    catch(Exception e)
+                    {
+                        LoggerProxy.Default.Error(e);
+                    }
                 }
 
                 resHeaderBuilder.Append("\r\n");
