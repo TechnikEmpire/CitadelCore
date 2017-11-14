@@ -45,7 +45,8 @@ namespace CitadelCore.Net.ConnectionAdapters
         /// <summary>
         /// Permitted TLS protocols. 
         /// </summary>
-        private static readonly SslProtocols s_allowedTlsProtocols = SslProtocols.Tls11 | SslProtocols.Tls12;
+        //private static readonly SslProtocols s_allowedTlsProtocols = SslProtocols.Tls11 | SslProtocols.Tls12;
+        private static readonly SslProtocols s_allowedTlsProtocols = SslProtocols.Ssl2 | SslProtocols.Ssl3 | SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12;
 
         public TlsSniConnectionAdapter()
         {

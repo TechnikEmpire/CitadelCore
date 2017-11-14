@@ -17,9 +17,9 @@ Add key usage extension to CA certificate.
 Retroactively date all certificates, and in GMT.
 Try/Catch on every header addition because some sites include header values that are illegal and .NET just won't permit them. So try/catch and continue for each header key/value.</PackageReleaseNotes>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>1.2.20</Version>
-    <AssemblyVersion>1.2.20.0</AssemblyVersion>
-    <FileVersion>1.2.20.0</FileVersion>    
+    <Version>1.3.0</Version>
+    <AssemblyVersion>1.3.0.0</AssemblyVersion>
+    <FileVersion>1.3.0.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">
