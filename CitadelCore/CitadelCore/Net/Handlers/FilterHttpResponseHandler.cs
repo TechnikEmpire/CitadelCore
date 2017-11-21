@@ -10,11 +10,14 @@ using CitadelCore.Net.Http;
 using CitadelCore.Net.Proxy;
 using Microsoft.AspNetCore.Http;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace CitadelCore.Net.Handlers
@@ -32,10 +35,17 @@ namespace CitadelCore.Net.Handlers
 
         private static HttpClient s_client;
 
+        private static readonly Regex s_httpVerRegex = new Regex("([0-9]+\\.[0-9]+)", RegexOptions.Compiled | RegexOptions.ECMAScript);
+
         static FilterHttpResponseHandler()
         {
             // Enforce global use of good/strong TLS protocols.
             ServicePointManager.SecurityProtocol = (ServicePointManager.SecurityProtocol & ~SecurityProtocolType.Ssl3) | (SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12);
+
+            ServicePointManager.Expect100Continue = false;
+            ServicePointManager.CheckCertificateRevocationList = true;
+            ServicePointManager.ReusePort = true;
+            ServicePointManager.UseNagleAlgorithm = false;
 
             // We need UseCookies set to false here. We then need to set per-request cookies by
             // manually adding the "Cookie" header. If we don't have UseCookies set to false here,
@@ -46,12 +56,12 @@ namespace CitadelCore.Net.Handlers
                 UseCookies = false,
                 //PreAuthenticate = false,
                 //UseDefaultCredentials = false,
-                AllowAutoRedirect = false,
+                AllowAutoRedirect = false,                
                 Proxy = null
             };
 
             s_client = new HttpClient(handler);
-        }
+        }        
 
         public FilterHttpResponseHandler(MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback) : base(messageBeginCallback, messageEndCallback)
         {
@@ -62,7 +72,8 @@ namespace CitadelCore.Net.Handlers
             try
             {
                 // Use helper to get the full, proper URL for the request.
-                var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
+                //var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
+                var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetEncodedUrl(context.Request);
 
                 // Next we need to try and parse the URL as a URI, because the websocket client
                 // requires this for connecting upstream.
@@ -76,7 +87,7 @@ namespace CitadelCore.Net.Handlers
 
                 // Create a new request to send out upstream.                
                 var requestMsg = new HttpRequestMessage(new HttpMethod(context.Request.Method), fullUrl);
-
+                
                 if(context.Connection.ClientCertificate != null)
                 {
                     // TODO - Handle client certificates.
@@ -85,31 +96,48 @@ namespace CitadelCore.Net.Handlers
                 // Build request headers into this, so we can pass the result to message begin/end callbacks.
                 var reqHeaderBuilder = new StringBuilder();
 
+                var failedInitialHeaders = new List<Tuple<string, string>>();
+
                 // Clone headers from the real client request to our upstream HTTP request.
                 foreach(var hdr in context.Request.Headers)
                 {
-                    if(ForbiddenHttpHeaders.IsForbidden(hdr.Key))
-                    {
-                        continue;
-                    }
-
                     try
                     {
                         reqHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, hdr.Value.ToString());
                     }
                     catch { }
 
+                    if(ForbiddenHttpHeaders.IsForbidden(hdr.Key))
+                    {
+                        continue;
+                    }
+
                     if(!requestMsg.Headers.TryAddWithoutValidation(hdr.Key, hdr.Value.ToString()))
                     {
-                        // TODO - I don't think we really need to log this, it's annoying because
-                        // it's the same thing over and over again about content type, and we don't
-                        // care because we set it manually elsewhere.
+
+                        string hName = hdr.Key != null ? hdr.Key : string.Empty;
+                        string hValue = hdr.Value.ToString() != null ? hdr.Value.ToString() : string.Empty;
                         /*
-                        string hName = hdr.Key != null ? hdr.Key : "HEADER_KEY_MISSING";
-                        string hValue = hdr.Value.ToString() != null ? hdr.Value.ToString() : "HEADER_VALUE_MISSING";
                         LoggerProxy.Default.Warn(string.Format("Failed to add HTTP header with key {0} and with value {1}.", hName, hValue));
                         */
+
+                        if(hName.Length > 0 && hValue.Length > 0)
+                        {
+                            failedInitialHeaders.Add(new Tuple<string, string>(hName, hValue));
+                        }
                     }
+                }
+
+                // Match the HTTP version of the client on the upstream request.
+                // We don't want to transparently pass around headers that are wrong
+                // for the client's HTTP version.
+                Version upstreamReqVersionMatch = null;
+                
+                Match match = s_httpVerRegex.Match(context.Request.Protocol);
+                if(match != null && match.Success)
+                {   
+                    upstreamReqVersionMatch = Version.Parse(match.Value);                    
+                    requestMsg.Version = upstreamReqVersionMatch;
                 }
 
                 // Add trailing CRLF to the request headers string.
@@ -141,13 +169,7 @@ namespace CitadelCore.Net.Handlers
                 // Get the request body into memory.
                 using(var ms = new MemoryStream())
                 {
-                    await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(context.Request.Body, ms, null, context.RequestAborted);
-
-                    if(context.RequestAborted.IsCancellationRequested)
-                    {
-                        // Client aborted so just abort here.
-                        return;
-                    }
+                    await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(context.Request.Body, ms, null, context.RequestAborted);                   
 
                     var requestBody = ms.ToArray();
 
@@ -186,46 +208,50 @@ namespace CitadelCore.Net.Handlers
                         // Set our content, even if it's empty. Don't worry about ByteArrayContent
                         // and friends setting other headers, we're gonna blow relevant headers away
                         // below and then set them properly.
-                        requestMsg.Content = new ByteArrayContent(ms.ToArray());
+                        requestMsg.Content = new ByteArrayContent(requestBody);
+
+                        requestMsg.Content.Headers.Clear();
+
+                        requestMsg.Content.Headers.TryAddWithoutValidation("Content-Length", requestBody.Length.ToString());
                     }
                 }
 
                 // Ensure that content type is set properly because ByteArrayContent and friends will
                 // modify these fields.
-                var inputContentType = context.Request.ContentType;
-                if(!string.IsNullOrEmpty(inputContentType) && !string.IsNullOrWhiteSpace(inputContentType))
+                foreach(var et in failedInitialHeaders)
                 {
-                    try
-                    {
-                        requestMsg.Headers.Remove("Content-Type");
-                    }
-                    catch { }
-
-                    try
+                    if(!requestMsg.Headers.TryAddWithoutValidation(et.Item1, et.Item2))
                     {
                         if(requestMsg.Content != null)
                         {
-                            requestMsg.Content.Headers.Remove("Content-Type");
-                        }                        
+                            if(!requestMsg.Content.Headers.TryAddWithoutValidation(et.Item1, et.Item2))
+                            {
+                                LoggerProxy.Default.Warn(string.Format("Failed to add HTTP header with key {0} and with value {1}.", et.Item1, et.Item2));
+                            }
+                        }
                     }
-                    catch { }
-
-                    if(requestMsg.Content != null)
-                    {
-                        requestMsg.Content.Headers.TryAddWithoutValidation("Content-Type", inputContentType);
-                    }
-                    else
-                    {
-                        requestMsg.Headers.TryAddWithoutValidation("Content-Type", inputContentType);
-                    }                    
-                }
+                }                
 
                 // Lets start sending the request upstream. We're going to as the client to return
                 // control to us when the headers are complete. This way we're not buffering entire
                 // responses into memory, and if the user doesn't request to inspect the content, we
                 // can just async stream the content transparently and Kestrel is so cool and sweet
                 // and nice, it'll automatically stream as chunked content.
-                var response = await s_client.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead);
+                HttpResponseMessage response = null;
+
+                try
+                {   
+                    response = await s_client.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+                }
+                catch(Exception e)
+                {
+                    LoggerProxy.Default.Error(e);
+                }
+
+                if(response == null)
+                {
+                    return;
+                }
 
                 // Blow away all response headers. We wanna clone these now from our upstream request.
                 context.Response.Headers.Clear();
@@ -241,19 +267,19 @@ namespace CitadelCore.Net.Handlers
                 // logical grouping.
                 foreach(var hdr in response.Content.Headers)
                 {
-                    if(ForbiddenHttpHeaders.IsForbidden(hdr.Key))
-                    {
-                        continue;
-                    }
-
                     try
                     {
                         resHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, string.Join(", ", hdr.Value));
                     }
                     catch { }
 
-                    try
+                    if(ForbiddenHttpHeaders.IsForbidden(hdr.Key))
                     {
+                        continue;
+                    }
+
+                    try
+                    {   
                         context.Response.Headers.Add(hdr.Key, new Microsoft.Extensions.Primitives.StringValues(hdr.Value.ToArray()));
                     }
                     catch(Exception e)
@@ -266,16 +292,16 @@ namespace CitadelCore.Net.Handlers
                 // clone over the generic headers.
                 foreach(var hdr in response.Headers)
                 {
-                    if(ForbiddenHttpHeaders.IsForbidden(hdr.Key))
-                    {
-                        continue;
-                    }
-
                     try
                     {
                         resHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, string.Join(", ", hdr.Value));
                     }
                     catch { }
+
+                    if(ForbiddenHttpHeaders.IsForbidden(hdr.Key))
+                    {
+                        continue;
+                    }
 
                     try
                     {
@@ -319,13 +345,7 @@ namespace CitadelCore.Net.Handlers
                         {
                             using(var ms = new MemoryStream())
                             {
-                                await upstreamResponseStream.CopyToAsync(ms, 81920, context.RequestAborted);
-
-                                if(context.RequestAborted.IsCancellationRequested)
-                                {
-                                    // Client aborted so just abort here.
-                                    return;
-                                }
+                                await upstreamResponseStream.CopyToAsync(ms, 81920, context.RequestAborted);                              
 
                                 var responseBody = ms.ToArray();
 
@@ -359,6 +379,13 @@ namespace CitadelCore.Net.Handlers
                                 // strict-compliance.
                                 if(responseBody.Length > 0 && context.Response.StatusCode != 204)
                                 {
+                                    // If the request is HTTP1.0, we need to pull all the data so we can properly
+                                    // set the content-length by adding the header in.
+                                    if(upstreamReqVersionMatch != null && upstreamReqVersionMatch.Major == 1 && upstreamReqVersionMatch.Minor == 0)
+                                    {
+                                        context.Response.Headers.Add("Content-Length", responseBody.Length.ToString());
+                                    }
+
                                     await context.Response.Body.WriteAsync(responseBody, 0, responseBody.Length);
                                 }
 
@@ -374,13 +401,29 @@ namespace CitadelCore.Net.Handlers
                 // without any inspection etc, so do exactly that.
                 using(var responseStream = await response.Content.ReadAsStreamAsync())
                 {
-                    await responseStream.CopyToAsync(context.Response.Body, 81920, context.RequestAborted);
+                    if(upstreamReqVersionMatch != null && upstreamReqVersionMatch.Major == 1 && upstreamReqVersionMatch.Minor == 0)
+                    {
+                        using(var ms = new MemoryStream())
+                        {
+                            await responseStream.CopyToAsync(ms, 81920, context.RequestAborted);
+
+                            var responseBody = ms.ToArray();
+
+                            context.Response.Headers.Add("Content-Length", responseBody.Length.ToString());
+
+                            await context.Response.Body.WriteAsync(responseBody, 0, responseBody.Length);
+                        }
+                    }
+                    else
+                    {
+                        await responseStream.CopyToAsync(context.Response.Body, 81920, context.RequestAborted);
+                    }
                 }
             }
             catch(Exception e)
             {
-                if(!(e is TaskCanceledException))
-                {
+                if(!(e is TaskCanceledException) && !(e is OperationCanceledException))
+                {   
                     // Ignore task cancelled exceptions.
                     LoggerProxy.Default.Error(e);
                 }
