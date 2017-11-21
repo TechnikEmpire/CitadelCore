@@ -20,9 +20,9 @@ Re-Order logic so that raw, unfiltered headers get passed to client callbacks.
 Handle special cases for Content-Length when client is HTTP1.0 and doesn't support chunking.
 Ignore Task/OperationAbort exceptions.</PackageReleaseNotes>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>1.3.7</Version>
-    <AssemblyVersion>1.3.7.0</AssemblyVersion>
-    <FileVersion>1.3.7.0</FileVersion>    
+    <Version>1.3.8</Version>
+    <AssemblyVersion>1.3.8.0</AssemblyVersion>
+    <FileVersion>1.3.8.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">

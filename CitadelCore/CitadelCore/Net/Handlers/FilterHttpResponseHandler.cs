@@ -98,9 +98,20 @@ namespace CitadelCore.Net.Handlers
 
                 var failedInitialHeaders = new List<Tuple<string, string>>();
 
+                bool requestHasZeroContentLength = false;
+
                 // Clone headers from the real client request to our upstream HTTP request.
                 foreach(var hdr in context.Request.Headers)
                 {
+                    try
+                    {
+                        if(hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && hdr.Value.ToString().Equals("0"))
+                        {
+                            requestHasZeroContentLength = true;
+                        }
+                    }
+                    catch { }
+
                     try
                     {
                         reqHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, hdr.Value.ToString());
@@ -117,10 +128,7 @@ namespace CitadelCore.Net.Handlers
 
                         string hName = hdr.Key != null ? hdr.Key : string.Empty;
                         string hValue = hdr.Value.ToString() != null ? hdr.Value.ToString() : string.Empty;
-                        /*
-                        LoggerProxy.Default.Warn(string.Format("Failed to add HTTP header with key {0} and with value {1}.", hName, hValue));
-                        */
-
+                        
                         if(hName.Length > 0 && hValue.Length > 0)
                         {
                             failedInitialHeaders.Add(new Tuple<string, string>(hName, hValue));
@@ -142,7 +150,7 @@ namespace CitadelCore.Net.Handlers
 
                 // Add trailing CRLF to the request headers string.
                 reqHeaderBuilder.Append("\r\n");
-
+                
                 // Since headers are complete at this stage, let's do our first call to message begin
                 // for the request side.
                 ProxyNextAction requestNextAction = ProxyNextAction.AllowAndIgnoreContentAndResponse;
@@ -169,13 +177,14 @@ namespace CitadelCore.Net.Handlers
                 // Get the request body into memory.
                 using(var ms = new MemoryStream())
                 {
-                    await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(context.Request.Body, ms, null, context.RequestAborted);                   
+                    await context.Request.Body.CopyToAsync(ms);
+                    //await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(context.Request.Body, ms, null, context.RequestAborted);
 
                     var requestBody = ms.ToArray();
 
                     // If we don't have a body, there's no sense in calling the message end callback.
                     if(requestBody.Length > 0)
-                    {   
+                    {
                         // We have a body and the user previously instructed us to give them the
                         // content, if any, for inspection.
                         if(requestNextAction == ProxyNextAction.AllowButRequestContentInspection)
@@ -193,12 +202,12 @@ namespace CitadelCore.Net.Handlers
                                 if(requestBlockResponse != null)
                                 {
                                     // User wants to block this request with a custom response.
-                                    await DoCustomResponse(context, requestBlockResponseContentType, requestBlockResponse);                                    
+                                    await DoCustomResponse(context, requestBlockResponseContentType, requestBlockResponse);
                                 }
                                 else
                                 {
                                     // User wants to block this request with a generic 204 response.
-                                    Do204(context);                                    
+                                    Do204(context);
                                 }
 
                                 return;
@@ -213,6 +222,15 @@ namespace CitadelCore.Net.Handlers
                         requestMsg.Content.Headers.Clear();
 
                         requestMsg.Content.Headers.TryAddWithoutValidation("Content-Length", requestBody.Length.ToString());
+                    }
+                    else
+                    {
+                        if(requestHasZeroContentLength)
+                        {
+                            requestMsg.Content = new ByteArrayContent(requestBody);
+                            requestMsg.Content.Headers.Clear();
+                            requestMsg.Content.Headers.TryAddWithoutValidation("Content-Length", "0");
+                        }
                     }
                 }
 
@@ -262,11 +280,22 @@ namespace CitadelCore.Net.Handlers
                 // Build response headers into this, so we can pass the result to message begin/end callbacks.
                 var resHeaderBuilder = new StringBuilder();
 
+                bool responseHasZeroContentLength = false;
+
                 // Iterate over all upstream response headers. Note that response.Content.Headers is
                 // not ALL headers. Headers are split up into different properties according to
                 // logical grouping.
                 foreach(var hdr in response.Content.Headers)
                 {
+                    try
+                    {
+                        if(hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && hdr.Value.ToString().Equals("0"))
+                        {
+                            responseHasZeroContentLength = true;
+                        }
+                    }
+                    catch { }
+
                     try
                     {
                         resHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, string.Join(", ", hdr.Value));
@@ -292,6 +321,15 @@ namespace CitadelCore.Net.Handlers
                 // clone over the generic headers.
                 foreach(var hdr in response.Headers)
                 {
+                    try
+                    {
+                        if(hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && hdr.Value.ToString().Equals("0"))
+                        {
+                            responseHasZeroContentLength = true;
+                        }
+                    }
+                    catch { }
+
                     try
                     {
                         resHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, string.Join(", ", hdr.Value));
@@ -388,6 +426,13 @@ namespace CitadelCore.Net.Handlers
 
                                     await context.Response.Body.WriteAsync(responseBody, 0, responseBody.Length);
                                 }
+                                else
+                                {
+                                    if(responseHasZeroContentLength)
+                                    {
+                                        context.Response.Headers.Add("Content-Length", "0");
+                                    }
+                                }
 
                                 // Ensure we exit here, because if we fall past this scope then the
                                 // response is going to get mangled.
@@ -416,7 +461,14 @@ namespace CitadelCore.Net.Handlers
                     }
                     else
                     {
-                        await responseStream.CopyToAsync(context.Response.Body, 81920, context.RequestAborted);
+                        if(responseHasZeroContentLength)
+                        {
+                            context.Response.Headers.Add("Content-Length", "0");
+                        }
+                        else
+                        {
+                            await responseStream.CopyToAsync(context.Response.Body, 81920, context.RequestAborted);
+                        }
                     }
                 }
             }
