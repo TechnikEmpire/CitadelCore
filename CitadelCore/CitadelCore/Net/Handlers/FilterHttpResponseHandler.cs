@@ -520,9 +520,8 @@ namespace CitadelCore.Net.Handlers
                 context.Response.StatusCode = 200;
                 context.Response.Headers.Add("Expires", new Microsoft.Extensions.Primitives.StringValues(s_EpochHttpDateTime));
                 context.Response.ContentType = contentType;
-
-                await context.Request.Body.WriteAsync(customResponseBody, 0, customResponseBody.Length);
-                //await ms.CopyToAsync(context.Response.Body, 4096, context.RequestAborted);
+                
+                await ms.CopyToAsync(context.Response.Body, 4096, context.RequestAborted);
             }
         }
     }
