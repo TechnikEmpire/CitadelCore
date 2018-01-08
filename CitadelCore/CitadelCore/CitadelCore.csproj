@@ -12,17 +12,13 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/TechnikEmpire/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Always strip content-length and content-encoding so they don't get forwarded by us.
-Handle all content specific headers correctly.
-Set HTTP version upstream to avoid passing wrong-version HTTP headers to and from client.
-Change URL extraction from "Display" to "Encoded".
-Re-Order logic so that raw, unfiltered headers get passed to client callbacks.
-Handle special cases for Content-Length when client is HTTP1.0 and doesn't support chunking.
-Ignore Task/OperationAbort exceptions.</PackageReleaseNotes>
+    <PackageReleaseNotes>Open max connections both downstream and upstream to unlimited/65535 respectively.
+Fixes a bug where the wrong bind endpoints were returned from ProxyServer class.
+Potentially fixes Windows 7 websocket issue by manually referencing .NET Standard 2.1 preview.</PackageReleaseNotes>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>1.3.8</Version>
-    <AssemblyVersion>1.3.8.0</AssemblyVersion>
-    <FileVersion>1.3.8.0</FileVersion>    
+    <Version>1.3.11</Version>
+    <AssemblyVersion>1.3.11.0</AssemblyVersion>
+    <FileVersion>1.3.11.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">
@@ -58,6 +54,10 @@ Ignore Task/OperationAbort exceptions.</PackageReleaseNotes>
     <PackageReference Include="Microsoft.AspNetCore.WebSockets.Server" Version="0.1.0" />
     <PackageReference Include="Portable.BouncyCastle" Version="1.8.1.3" />
     <PackageReference Include="StreamExtended" Version="1.0.81" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="NETStandard.Library" Version="2.1.0-preview1-26105-01" />
   </ItemGroup>
 
 </Project>

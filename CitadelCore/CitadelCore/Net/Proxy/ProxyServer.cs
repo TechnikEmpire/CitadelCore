@@ -63,7 +63,7 @@ namespace CitadelCore.Net.Proxy
         {
             get
             {
-                return m_v4HttpListenerEp;
+                return m_v4HttpsListenerEp;
             }
         }
 
@@ -87,7 +87,7 @@ namespace CitadelCore.Net.Proxy
         {
             get
             {
-                return m_v6HttpListenerEp;
+                return m_v6HttpsListenerEp;
             }
         }
 
@@ -269,6 +269,8 @@ namespace CitadelCore.Net.Proxy
 
                 opts.Limits.MaxRequestBodySize = null;
                 opts.Limits.MaxRequestBufferSize = null;
+                opts.Limits.MaxConcurrentConnections = null;
+                opts.Limits.MaxConcurrentUpgradedConnections = null;                
                 
                 // Listen for HTTPS connections. Keep a reference to the options object so we can get
                 // the chosen port number after we call start.

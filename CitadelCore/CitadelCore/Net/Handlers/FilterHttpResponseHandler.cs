@@ -15,7 +15,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -42,6 +41,10 @@ namespace CitadelCore.Net.Handlers
             // Enforce global use of good/strong TLS protocols.
             ServicePointManager.SecurityProtocol = (ServicePointManager.SecurityProtocol & ~SecurityProtocolType.Ssl3) | (SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12);
 
+            // If this isn't set, we'll have a massive bottlenet on our upstream flow. The
+            // performance gains here extreme. This must be set.
+            ServicePointManager.DefaultConnectionLimit = ushort.MaxValue;
+
             ServicePointManager.Expect100Continue = false;
             ServicePointManager.CheckCertificateRevocationList = true;
             ServicePointManager.ReusePort = true;
@@ -56,12 +59,12 @@ namespace CitadelCore.Net.Handlers
                 UseCookies = false,
                 //PreAuthenticate = false,
                 //UseDefaultCredentials = false,
-                AllowAutoRedirect = false,                
+                AllowAutoRedirect = false,
                 Proxy = null
             };
 
             s_client = new HttpClient(handler);
-        }        
+        }
 
         public FilterHttpResponseHandler(MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback) : base(messageBeginCallback, messageEndCallback)
         {
@@ -85,9 +88,9 @@ namespace CitadelCore.Net.Handlers
                     return;
                 }
 
-                // Create a new request to send out upstream.                
+                // Create a new request to send out upstream.
                 var requestMsg = new HttpRequestMessage(new HttpMethod(context.Request.Method), fullUrl);
-                
+
                 if(context.Connection.ClientCertificate != null)
                 {
                     // TODO - Handle client certificates.
@@ -125,10 +128,9 @@ namespace CitadelCore.Net.Handlers
 
                     if(!requestMsg.Headers.TryAddWithoutValidation(hdr.Key, hdr.Value.ToString()))
                     {
-
                         string hName = hdr.Key != null ? hdr.Key : string.Empty;
                         string hValue = hdr.Value.ToString() != null ? hdr.Value.ToString() : string.Empty;
-                        
+
                         if(hName.Length > 0 && hValue.Length > 0)
                         {
                             failedInitialHeaders.Add(new Tuple<string, string>(hName, hValue));
@@ -136,21 +138,20 @@ namespace CitadelCore.Net.Handlers
                     }
                 }
 
-                // Match the HTTP version of the client on the upstream request.
-                // We don't want to transparently pass around headers that are wrong
-                // for the client's HTTP version.
+                // Match the HTTP version of the client on the upstream request. We don't want to
+                // transparently pass around headers that are wrong for the client's HTTP version.
                 Version upstreamReqVersionMatch = null;
-                
+
                 Match match = s_httpVerRegex.Match(context.Request.Protocol);
                 if(match != null && match.Success)
-                {   
-                    upstreamReqVersionMatch = Version.Parse(match.Value);                    
+                {
+                    upstreamReqVersionMatch = Version.Parse(match.Value);
                     requestMsg.Version = upstreamReqVersionMatch;
                 }
 
                 // Add trailing CRLF to the request headers string.
                 reqHeaderBuilder.Append("\r\n");
-                
+
                 // Since headers are complete at this stage, let's do our first call to message begin
                 // for the request side.
                 ProxyNextAction requestNextAction = ProxyNextAction.AllowAndIgnoreContentAndResponse;
@@ -168,7 +169,7 @@ namespace CitadelCore.Net.Handlers
                     else
                     {
                         // User wants to block this request with a generic 204 response.
-                        Do204(context);                        
+                        Do204(context);
                     }
 
                     return;
@@ -177,8 +178,7 @@ namespace CitadelCore.Net.Handlers
                 // Get the request body into memory.
                 using(var ms = new MemoryStream())
                 {
-                    await context.Request.Body.CopyToAsync(ms);
-                    //await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(context.Request.Body, ms, null, context.RequestAborted);
+                    await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(context.Request.Body, ms, null, context.RequestAborted);
 
                     var requestBody = ms.ToArray();
 
@@ -248,7 +248,7 @@ namespace CitadelCore.Net.Handlers
                             }
                         }
                     }
-                }                
+                }
 
                 // Lets start sending the request upstream. We're going to as the client to return
                 // control to us when the headers are complete. This way we're not buffering entire
@@ -258,7 +258,7 @@ namespace CitadelCore.Net.Handlers
                 HttpResponseMessage response = null;
 
                 try
-                {   
+                {
                     response = await s_client.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
                 }
                 catch(Exception e)
@@ -308,7 +308,7 @@ namespace CitadelCore.Net.Handlers
                     }
 
                     try
-                    {   
+                    {
                         context.Response.Headers.Add(hdr.Key, new Microsoft.Extensions.Primitives.StringValues(hdr.Value.ToArray()));
                     }
                     catch(Exception e)
@@ -368,12 +368,12 @@ namespace CitadelCore.Net.Handlers
                         if(responseBlockResponse != null)
                         {
                             // User wants to block this response with a custom response.
-                            await DoCustomResponse(context, responseBlockResponseContentType, responseBlockResponse);                            
+                            await DoCustomResponse(context, responseBlockResponseContentType, responseBlockResponse);
                         }
                         else
                         {
                             // User wants to block this response with a generic 204 response.
-                            Do204(context);                            
+                            Do204(context);
                         }
                     }
 
@@ -383,7 +383,7 @@ namespace CitadelCore.Net.Handlers
                         {
                             using(var ms = new MemoryStream())
                             {
-                                await upstreamResponseStream.CopyToAsync(ms, 81920, context.RequestAborted);                              
+                                await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(upstreamResponseStream, ms, null, context.RequestAborted);
 
                                 var responseBody = ms.ToArray();
 
@@ -411,14 +411,14 @@ namespace CitadelCore.Net.Handlers
                                 // User inspected but allowed the content. Just write to the response
                                 // body and then move on with your life fam.
                                 //
-                                // However, don't try to write a body if it's zero length. Also, do not try
-                                // to write a body, even  if present, if the status is 204. Kestrel will not
-                                // let us do this, and so far I can't find a way to remove this technically correct
-                                // strict-compliance.
+                                // However, don't try to write a body if it's zero length. Also, do
+                                // not try to write a body, even if present, if the status is 204.
+                                // Kestrel will not let us do this, and so far I can't find a way to
+                                // remove this technically correct strict-compliance.
                                 if(responseBody.Length > 0 && context.Response.StatusCode != 204)
                                 {
-                                    // If the request is HTTP1.0, we need to pull all the data so we can properly
-                                    // set the content-length by adding the header in.
+                                    // If the request is HTTP1.0, we need to pull all the data so we
+                                    // can properly set the content-length by adding the header in.
                                     if(upstreamReqVersionMatch != null && upstreamReqVersionMatch.Major == 1 && upstreamReqVersionMatch.Minor == 0)
                                     {
                                         context.Response.Headers.Add("Content-Length", responseBody.Length.ToString());
@@ -444,13 +444,14 @@ namespace CitadelCore.Net.Handlers
 
                 // If we made it here, then the user just wants to let the response be streamed in
                 // without any inspection etc, so do exactly that.
+
                 using(var responseStream = await response.Content.ReadAsStreamAsync())
                 {
                     if(upstreamReqVersionMatch != null && upstreamReqVersionMatch.Major == 1 && upstreamReqVersionMatch.Minor == 0)
                     {
                         using(var ms = new MemoryStream())
                         {
-                            await responseStream.CopyToAsync(ms, 81920, context.RequestAborted);
+                            await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(responseStream, ms, null, context.RequestAborted);
 
                             var responseBody = ms.ToArray();
 
@@ -467,7 +468,7 @@ namespace CitadelCore.Net.Handlers
                         }
                         else
                         {
-                            await responseStream.CopyToAsync(context.Response.Body, 81920, context.RequestAborted);
+                            await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(responseStream, context.Response.Body, null, context.RequestAborted);
                         }
                     }
                 }
@@ -475,7 +476,7 @@ namespace CitadelCore.Net.Handlers
             catch(Exception e)
             {
                 if(!(e is TaskCanceledException) && !(e is OperationCanceledException))
-                {   
+                {
                     // Ignore task cancelled exceptions.
                     LoggerProxy.Default.Error(e);
                 }
@@ -491,7 +492,7 @@ namespace CitadelCore.Net.Handlers
         private void Do204(HttpContext context)
         {
             context.Response.Headers.Clear();
-            context.Response.StatusCode = 204;            
+            context.Response.StatusCode = 204;
             context.Response.Headers.Add("Expires", new Microsoft.Extensions.Primitives.StringValues(s_EpochHttpDateTime));
         }
 
@@ -516,10 +517,12 @@ namespace CitadelCore.Net.Handlers
             {
                 ms.Position = 0;
                 context.Response.Headers.Clear();
-                context.Response.StatusCode = 200;                
-                context.Response.Headers.Add("Expires", new Microsoft.Extensions.Primitives.StringValues(s_EpochHttpDateTime));                
+                context.Response.StatusCode = 200;
+                context.Response.Headers.Add("Expires", new Microsoft.Extensions.Primitives.StringValues(s_EpochHttpDateTime));
                 context.Response.ContentType = contentType;
-                await ms.CopyToAsync(context.Response.Body, 81920, context.RequestAborted);                
+
+                await context.Request.Body.WriteAsync(customResponseBody, 0, customResponseBody.Length);
+                //await ms.CopyToAsync(context.Response.Body, 4096, context.RequestAborted);
             }
         }
     }
