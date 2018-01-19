@@ -58,15 +58,11 @@ namespace CitadelCore.Net.Handlers
                     LoggerProxy.Default.Error("Failed to parse websocket URI.");
                     return;
                 }
-
-                LoggerProxy.Default.Info("Accepting websocket client.");
-
+                
                 // Create, via acceptor, the client websocket. This is the local machine's websocket.
                 var wsClient = await context.WebSockets.AcceptWebSocketAsync();
 
-                LoggerProxy.Default.Info(wsClient.GetType().FullName);
-
-                LoggerProxy.Default.Info("Websocket client accepted.");
+                LoggerProxy.Default.Info(wsClient.GetType().FullName);                
 
                 // Create the websocket that's going to connect to the remote server.
                 ClientWebSocket wsServer = new ClientWebSocket();
@@ -75,8 +71,6 @@ namespace CitadelCore.Net.Handlers
 
                 foreach(var cookie in context.Request.Cookies)
                 {
-                    LoggerProxy.Default.Info(string.Format("Adding websocket cookie {0}={1}", cookie.Key, cookie.Value));
-
                     try
                     {
                         wsServer.Options.Cookies.Add(new Uri(fullUrl, UriKind.Absolute), new System.Net.Cookie(cookie.Key, System.Net.WebUtility.UrlEncode(cookie.Value)));
@@ -122,8 +116,7 @@ namespace CitadelCore.Net.Handlers
                         {
                             if(hdr.Key.IndexOf("cookie", StringComparison.OrdinalIgnoreCase) != -1)
                             {
-                                wsServer.Options.SetRequestHeader(hdr.Key, hdr.Value.ToString());
-                                Console.WriteLine("ADDED COOKIE DO");
+                                wsServer.Options.SetRequestHeader(hdr.Key, hdr.Value.ToString());                                
                             }
                         }
                         catch(Exception hdrException)
