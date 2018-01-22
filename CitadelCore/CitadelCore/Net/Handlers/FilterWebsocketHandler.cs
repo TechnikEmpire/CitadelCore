@@ -62,26 +62,30 @@ namespace CitadelCore.Net.Handlers
                 // Create, via acceptor, the client websocket. This is the local machine's websocket.
                 var wsClient = await context.WebSockets.AcceptWebSocketAsync();
 
-                LoggerProxy.Default.Info(wsClient.GetType().FullName);                
-
                 // Create the websocket that's going to connect to the remote server.
                 ClientWebSocket wsServer = new ClientWebSocket();
 
-                wsServer.Options.Cookies = new System.Net.CookieContainer();
+                if(wsClient.SubProtocol != null && wsClient.SubProtocol.Length > 0)
+                {
+                    
+                    wsServer.Options.AddSubProtocol(wsClient.SubProtocol);
+                }
+
+                wsServer.Options.Cookies = new System.Net.CookieContainer();                
 
                 foreach(var cookie in context.Request.Cookies)
                 {
                     try
                     {
-                        wsServer.Options.Cookies.Add(new Uri(fullUrl, UriKind.Absolute), new System.Net.Cookie(cookie.Key, System.Net.WebUtility.UrlEncode(cookie.Value)));
+                        wsServer.Options.Cookies.Add(new Uri(fullUrl, UriKind.Absolute), new System.Net.Cookie(cookie.Key, System.Net.WebUtility.UrlEncode(cookie.Value)));                        
                     }
                     catch(Exception e)
                     {
                         LoggerProxy.Default.Error("Error while attempting to add websocket cookie.");
-                        LoggerProxy.Default.Error(e);
+                        LoggerProxy.Default.Error(e);                        
                     }
                 }
-
+                
                 /*
                 TODO - Much of this is presently lost to us because the socket
                 we get from AcceptWebSocketAsync is a mostly internal implementation
@@ -114,13 +118,15 @@ namespace CitadelCore.Net.Handlers
 
                         try
                         {
-                            if(hdr.Key.IndexOf("cookie", StringComparison.OrdinalIgnoreCase) != -1)
+                            if(!ForbiddenWsHeaders.IsForbidden(hdr.Key))
                             {
-                                wsServer.Options.SetRequestHeader(hdr.Key, hdr.Value.ToString());                                
+                                wsServer.Options.SetRequestHeader(hdr.Key, hdr.Value.ToString());
+                                Console.WriteLine("Set Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
                             }
                         }
                         catch(Exception hdrException)
                         {
+                            Console.WriteLine("Failed Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
                             LoggerProxy.Default.Error(hdrException);
                         }
                     }
@@ -130,7 +136,7 @@ namespace CitadelCore.Net.Handlers
 
                 // Connect the server websocket to the upstream, remote webserver.
                 await wsServer.ConnectAsync(wsUri, context.RequestAborted);
-
+                
                 LoggerProxy.Default.Info(String.Format("Connected websocket to {0}", wsUri.AbsoluteUri));
 
                 ProxyNextAction nxtAction = ProxyNextAction.AllowAndIgnoreContentAndResponse;
