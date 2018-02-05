@@ -30,7 +30,10 @@ namespace CitadelCore.Net.Http
             "Sec-WebSocket-Key",
 
             // We manually add cookies so we don't want them this way.
-            "Cookie"
+            "Cookie",
+
+            "Upgrade",
+            "Sec-WebSocket-Version"
         };
 
         /// <summary>

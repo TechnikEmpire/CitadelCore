@@ -15,6 +15,7 @@ using System.Text;
 using System.Threading;
 using CitadelCore.Net.Http;
 using CitadelCore.Extensions;
+using CitadelCore.Net.WebSockets;
 
 namespace CitadelCore.Net.Handlers
 {
@@ -28,7 +29,7 @@ namespace CitadelCore.Net.Handlers
     {
         public FilterWebsocketHandler(MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback) : base(messageBeginCallback, messageEndCallback)
         {
-
+            Console.WriteLine("New FilterWebsocketHandler");
         }
 
         public override async Task Handle(HttpContext context)
@@ -40,11 +41,11 @@ namespace CitadelCore.Net.Handlers
                 var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
 
                 // Need to replate the scheme with appropriate websocket scheme.
-                if(fullUrl.StartsWith("http://"))
+                if (fullUrl.StartsWith("http://"))
                 {
                     fullUrl = "ws://" + fullUrl.Substring(7);
                 }
-                else if(fullUrl.StartsWith("https://"))
+                else if (fullUrl.StartsWith("https://"))
                 {
                     fullUrl = "wss://" + fullUrl.Substring(8);
                 }
@@ -53,38 +54,20 @@ namespace CitadelCore.Net.Handlers
                 // this for connecting upstream.
                 Uri wsUri = null;
 
-                if(!Uri.TryCreate(fullUrl, UriKind.RelativeOrAbsolute, out wsUri))
+                if (!Uri.TryCreate(fullUrl, UriKind.RelativeOrAbsolute, out wsUri))
                 {
                     LoggerProxy.Default.Error("Failed to parse websocket URI.");
                     return;
                 }
                 
                 // Create, via acceptor, the client websocket. This is the local machine's websocket.
-                var wsClient = await context.WebSockets.AcceptWebSocketAsync();
+                var wsClient = await context.WebSockets.AcceptWebSocketAsync(); // The bug is here.
 
+                WebSocketInfo info = CitadelWebSocketManager.Default.GetNegotiatedSocket(wsClient);
+
+                // Unfortunately, due to the messy nature of this architecture, we can't 
                 // Create the websocket that's going to connect to the remote server.
-                ClientWebSocket wsServer = new ClientWebSocket();
-
-                if(wsClient.SubProtocol != null && wsClient.SubProtocol.Length > 0)
-                {
-                    
-                    wsServer.Options.AddSubProtocol(wsClient.SubProtocol);
-                }
-
-                wsServer.Options.Cookies = new System.Net.CookieContainer();                
-
-                foreach(var cookie in context.Request.Cookies)
-                {
-                    try
-                    {
-                        wsServer.Options.Cookies.Add(new Uri(fullUrl, UriKind.Absolute), new System.Net.Cookie(cookie.Key, System.Net.WebUtility.UrlEncode(cookie.Value)));                        
-                    }
-                    catch(Exception e)
-                    {
-                        LoggerProxy.Default.Error("Error while attempting to add websocket cookie.");
-                        LoggerProxy.Default.Error(e);                        
-                    }
-                }
+                ClientWebSocket wsServer = info.ClientSocket;
                 
                 /*
                 TODO - Much of this is presently lost to us because the socket
@@ -102,47 +85,17 @@ namespace CitadelCore.Net.Handlers
                 wsServer.Options.UseDefaultCredentials = wsClient.Options.UseDefaultCredentials;
                 */
 
-                if(context.Connection.ClientCertificate != null)
+                if (context.Connection.ClientCertificate != null)
                 {
                     wsServer.Options.ClientCertificates = new System.Security.Cryptography.X509Certificates.X509CertificateCollection(new[] { context.Connection.ClientCertificate.ToV2Certificate() });
                 }
 
                 LoggerProxy.Default.Info(string.Format("Connecting websocket to {0}", wsUri.AbsoluteUri));
 
-                var reqHeaderBuilder = new StringBuilder();
-                foreach(var hdr in context.Request.Headers)
-                {
-                    if(!ForbiddenHttpHeaders.IsForbidden(hdr.Key))
-                    {
-                        reqHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, hdr.Value.ToString());
-
-                        try
-                        {
-                            if(!ForbiddenWsHeaders.IsForbidden(hdr.Key))
-                            {
-                                wsServer.Options.SetRequestHeader(hdr.Key, hdr.Value.ToString());
-                                Console.WriteLine("Set Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
-                            }
-                        }
-                        catch(Exception hdrException)
-                        {
-                            Console.WriteLine("Failed Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
-                            LoggerProxy.Default.Error(hdrException);
-                        }
-                    }
-                }
-
-                reqHeaderBuilder.Append("\r\n");
-
-                // Connect the server websocket to the upstream, remote webserver.
-                await wsServer.ConnectAsync(wsUri, context.RequestAborted);
-                
-                LoggerProxy.Default.Info(String.Format("Connected websocket to {0}", wsUri.AbsoluteUri));
-
                 ProxyNextAction nxtAction = ProxyNextAction.AllowAndIgnoreContentAndResponse;
                 string customResponseContentType = string.Empty;
                 byte[] customResponse = null;
-                m_msgBeginCb?.Invoke(wsUri, reqHeaderBuilder.ToString(), null, context.Request.IsHttps ? MessageType.SecureWebSocket : MessageType.WebSocket, MessageDirection.Request, out nxtAction, out customResponseContentType, out customResponse);
+                m_msgBeginCb?.Invoke(wsUri, info.RequestHeaders, null, context.Request.IsHttps ? MessageType.SecureWebSocket : MessageType.WebSocket, MessageDirection.Request, out nxtAction, out customResponseContentType, out customResponse);
 
                 switch(nxtAction)
                 {
