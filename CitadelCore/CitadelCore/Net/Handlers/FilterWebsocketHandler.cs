@@ -58,18 +58,9 @@ namespace CitadelCore.Net.Handlers
                     LoggerProxy.Default.Error("Failed to parse websocket URI.");
                     return;
                 }
-                
-                // Create, via acceptor, the client websocket. This is the local machine's websocket.
-                var wsClient = await context.WebSockets.AcceptWebSocketAsync();
 
                 // Create the websocket that's going to connect to the remote server.
                 ClientWebSocket wsServer = new ClientWebSocket();
-
-                if(wsClient.SubProtocol != null && wsClient.SubProtocol.Length > 0)
-                {
-                    
-                    wsServer.Options.AddSubProtocol(wsClient.SubProtocol);
-                }
 
                 wsServer.Options.Cookies = new System.Net.CookieContainer();                
 
@@ -138,6 +129,9 @@ namespace CitadelCore.Net.Handlers
                 await wsServer.ConnectAsync(wsUri, context.RequestAborted);
                 
                 LoggerProxy.Default.Info(String.Format("Connected websocket to {0}", wsUri.AbsoluteUri));
+
+                // Create, via acceptor, the client websocket. This is the local machine's websocket.
+                var wsClient = await context.WebSockets.AcceptWebSocketAsync(wsServer.SubProtocol ?? string.Empty);
 
                 ProxyNextAction nxtAction = ProxyNextAction.AllowAndIgnoreContentAndResponse;
                 string customResponseContentType = string.Empty;

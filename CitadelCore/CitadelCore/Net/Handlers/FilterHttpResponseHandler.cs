@@ -57,12 +57,10 @@ namespace CitadelCore.Net.Handlers
             {
                 AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
                 UseCookies = false,
-                //PreAuthenticate = false,
-                //UseDefaultCredentials = false,
                 AllowAutoRedirect = false,
                 Proxy = null
             };
-
+            
             s_client = new HttpClient(handler);
         }
 
