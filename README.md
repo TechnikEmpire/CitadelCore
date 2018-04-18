@@ -5,6 +5,7 @@ CitadelCore supports proxying of both HTTP/S and Websocket (Ws/Wss) connections.
 
 For the Windows specific implementation, please see [CitadelCore.Windows](https://github.com/TechnikEmpire/CitadelCore.Windows).
 
+[![Build Status](https://travis-ci.org/TechnikEmpire/CitadelCore.svg?branch=master)](https://travis-ci.org/TechnikEmpire/CitadelCore)
 <a href="https://scan.coverity.com/projects/technikempire-citadelcore">
   <img alt="Coverity Scan Build Status"
        src="https://scan.coverity.com/projects/15514/badge.svg"/>
