@@ -1,6 +1,6 @@
 language: csharp
 mono: none
-dotnet: 1.1.5
+dotnet: 2.1.105
 solution: CitadelCore.sln
 script: dotnet clean && dotnet build --configuration Release
 env:
