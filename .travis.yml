@@ -2,6 +2,7 @@ language: csharp
 mono: none
 dotnet: 1.1.5
 solution: CitadelCore.sln
+script: dotnet clean && dotnet build --configuration Release
 env:
   global:
    # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
