@@ -29,6 +29,10 @@ namespace CitadelCore.Net.Http
             // We don't want to pass negotiation stuff upstream.
             "Sec-WebSocket-Key",
 
+            // Don't set the version for our client socket. Microsoft sets
+            // this all by themselves.
+            "Sec-WebSocket-Version",
+
             // We manually add cookies so we don't want them this way.
             "Cookie"
         };

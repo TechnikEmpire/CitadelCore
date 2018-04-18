@@ -15,6 +15,7 @@ using System.Text;
 using System.Threading;
 using CitadelCore.Net.Http;
 using CitadelCore.Extensions;
+using System.Collections.Generic;
 
 namespace CitadelCore.Net.Handlers
 {
@@ -61,10 +62,10 @@ namespace CitadelCore.Net.Handlers
 
                 // Create the websocket that's going to connect to the remote server.
                 ClientWebSocket wsServer = new ClientWebSocket();
+                wsServer.Options.Cookies = new System.Net.CookieContainer();
+                wsServer.Options.SetBuffer((int)ushort.MaxValue * 16, (int)ushort.MaxValue * 16);
 
-                wsServer.Options.Cookies = new System.Net.CookieContainer();                
-
-                foreach(var cookie in context.Request.Cookies)
+                foreach (var cookie in context.Request.Cookies)
                 {
                     try
                     {
@@ -76,29 +77,11 @@ namespace CitadelCore.Net.Handlers
                         LoggerProxy.Default.Error(e);                        
                     }
                 }
-                
-                /*
-                TODO - Much of this is presently lost to us because the socket
-                we get from AcceptWebSocketAsync is a mostly internal implementation
-                that is NOT a ClientWebSocket.
-
-                Ideally we would xfer all such properties from the client to our proxy
-                client socket.
-
-                wsServer.Options.ClientCertificates = wsClient.Options.ClientCertificates;
-                wsServer.Options.Cookies = wsClient.Options.Cookies;
-                wsServer.Options.Credentials = wsClient.Options.Credentials;
-                wsServer.Options.KeepAliveInterval = wsClient.Options.KeepAliveInterval;
-                wsServer.Options.Proxy = wsClient.Options.Proxy;
-                wsServer.Options.UseDefaultCredentials = wsClient.Options.UseDefaultCredentials;
-                */
 
                 if(context.Connection.ClientCertificate != null)
                 {
                     wsServer.Options.ClientCertificates = new System.Security.Cryptography.X509Certificates.X509CertificateCollection(new[] { context.Connection.ClientCertificate.ToV2Certificate() });
                 }
-
-                LoggerProxy.Default.Info(string.Format("Connecting websocket to {0}", wsUri.AbsoluteUri));
 
                 var reqHeaderBuilder = new StringBuilder();
                 foreach(var hdr in context.Request.Headers)
@@ -125,13 +108,15 @@ namespace CitadelCore.Net.Handlers
 
                 reqHeaderBuilder.Append("\r\n");
 
+                LoggerProxy.Default.Info(string.Format("Connecting websocket to {0}", wsUri.AbsoluteUri));
+
                 // Connect the server websocket to the upstream, remote webserver.
                 await wsServer.ConnectAsync(wsUri, context.RequestAborted);
                 
                 LoggerProxy.Default.Info(String.Format("Connected websocket to {0}", wsUri.AbsoluteUri));
 
                 // Create, via acceptor, the client websocket. This is the local machine's websocket.
-                var wsClient = await context.WebSockets.AcceptWebSocketAsync(wsServer.SubProtocol ?? string.Empty);
+                var wsClient = await context.WebSockets.AcceptWebSocketAsync(wsServer.SubProtocol ?? null);
 
                 ProxyNextAction nxtAction = ProxyNextAction.AllowAndIgnoreContentAndResponse;
                 string customResponseContentType = string.Empty;
@@ -156,34 +141,81 @@ namespace CitadelCore.Net.Handlers
                 // write any data it gets to the client websocket.
                 var serverTask = Task.Run(async () =>
                 {
+                    System.Net.WebSockets.WebSocketReceiveResult serverStatus = null;
                     var serverBuffer = new byte[1024 * 4];
-                    var serverStatus = await wsServer.ReceiveAsync(new ArraySegment<byte>(serverBuffer), context.RequestAborted);
-
-                    while(!serverStatus.CloseStatus.HasValue && !wsClient.CloseStatus.HasValue && !context.RequestAborted.IsCancellationRequested)
+                    try
                     {
-                        await wsClient.SendAsync(new ArraySegment<byte>(serverBuffer, 0, serverStatus.Count), serverStatus.MessageType, serverStatus.EndOfMessage, context.RequestAborted);
+                        bool looping = true;
 
                         serverStatus = await wsServer.ReceiveAsync(new ArraySegment<byte>(serverBuffer), context.RequestAborted);
-                    }
 
-                    await wsServer.CloseAsync(serverStatus.CloseStatus.Value, serverStatus.CloseStatusDescription, context.RequestAborted);
+                        while (looping && !serverStatus.CloseStatus.HasValue && !context.RequestAborted.IsCancellationRequested)
+                        {
+                            await wsClient.SendAsync(new ArraySegment<byte>(serverBuffer, 0, serverStatus.Count), serverStatus.MessageType, serverStatus.EndOfMessage, context.RequestAborted);
+
+                            if(!wsClient.CloseStatus.HasValue)
+                            {
+                                serverStatus = await wsServer.ReceiveAsync(new ArraySegment<byte>(serverBuffer), context.RequestAborted);
+                                continue;
+                            }
+
+                            looping = false;
+                        }
+
+                        await wsClient.CloseAsync(serverStatus.CloseStatus.Value, serverStatus.CloseStatusDescription, context.RequestAborted);
+                    }
+                    catch
+                    {
+                        try
+                        {
+                            var closeStatus = serverStatus?.CloseStatus ?? System.Net.WebSockets.WebSocketCloseStatus.NormalClosure;
+                            var closeMessage = serverStatus?.CloseStatusDescription ?? string.Empty;
+
+                            await wsClient.CloseAsync(closeStatus, closeMessage, context.RequestAborted);
+                        }
+                        catch { }
+                    }
                 });
 
                 // Spawn an async task that will poll the local client websocket, in a loop, and then
                 // write any data it gets to the remote server websocket.
                 var clientTask = Task.Run(async () =>
                 {
+                    System.Net.WebSockets.WebSocketReceiveResult clientResult = null;
                     var clientBuffer = new byte[1024 * 4];
-                    var clientResult = await wsClient.ReceiveAsync(new ArraySegment<byte>(clientBuffer), context.RequestAborted);
-
-                    while(!clientResult.CloseStatus.HasValue && !wsServer.CloseStatus.HasValue && !context.RequestAborted.IsCancellationRequested)
+                    try
                     {
-                        await wsServer.SendAsync(new ArraySegment<byte>(clientBuffer, 0, clientResult.Count), clientResult.MessageType, clientResult.EndOfMessage, context.RequestAborted);
+
+                        bool looping = true;
 
                         clientResult = await wsClient.ReceiveAsync(new ArraySegment<byte>(clientBuffer), context.RequestAborted);
-                    }
 
-                    await wsClient.CloseAsync(clientResult.CloseStatus.Value, clientResult.CloseStatusDescription, context.RequestAborted);
+                        while (looping && !clientResult.CloseStatus.HasValue && !context.RequestAborted.IsCancellationRequested)
+                        {
+                            await wsServer.SendAsync(new ArraySegment<byte>(clientBuffer, 0, clientResult.Count), clientResult.MessageType, clientResult.EndOfMessage, context.RequestAborted);
+
+                            if(!wsServer.CloseStatus.HasValue)
+                            {
+                                clientResult = await wsClient.ReceiveAsync(new ArraySegment<byte>(clientBuffer), context.RequestAborted);
+                                continue;
+                            }
+
+                            looping = false;
+                        }
+                        
+                        await wsServer.CloseAsync(clientResult.CloseStatus.Value, clientResult.CloseStatusDescription, context.RequestAborted);
+                    }
+                    catch
+                    {
+                        try
+                        {
+                            var closeStatus = clientResult?.CloseStatus ?? System.Net.WebSockets.WebSocketCloseStatus.NormalClosure;
+                            var closeMessage = clientResult?.CloseStatusDescription ?? string.Empty;
+
+                            await wsServer.CloseAsync(closeStatus, closeMessage, context.RequestAborted);
+                        }
+                        catch { }
+                    }
                 });
 
                 // Above, we have created a bridge between the local and remote websocket. Wait for both
@@ -192,6 +224,19 @@ namespace CitadelCore.Net.Handlers
             }
             catch(Exception wshe)
             {
+                if(wshe is System.Net.WebSockets.WebSocketException)
+                {
+                    var cast = wshe as System.Net.WebSockets.WebSocketException;
+
+                    Console.WriteLine(cast.WebSocketErrorCode);
+                    if(cast.Data != null)
+                    {
+                        foreach(KeyValuePair<object, object> kvp in cast.Data)
+                        {
+                            Console.WriteLine("{0} ::: {1}", kvp.Key, kvp.Value);
+                        }
+                    }
+                }
                 LoggerProxy.Default.Error(wshe);
             }
         }

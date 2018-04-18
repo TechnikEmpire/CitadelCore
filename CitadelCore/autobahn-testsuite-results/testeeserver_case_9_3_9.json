@@ -1,0 +1,166 @@
+{
+   "agent": "TesteeServer",
+   "behavior": "OK",
+   "behaviorClose": "OK",
+   "case": 269,
+   "closedByMe": true,
+   "createStats": true,
+   "createWirelog": true,
+   "description": "Send fragmented text message message with message payload of length 4 * 2**20 (8M). Sent out in fragments of 4M.",
+   "droppedByMe": false,
+   "duration": 14232,
+   "expectation": "Receive echo'ed text message (with payload as sent).",
+   "expected": {},
+   "expectedClose": {
+      "closeCode": [
+         1000
+      ],
+      "closedByMe": true,
+      "requireClean": true
+   },
+   "failedByMe": false,
+   "httpRequest": "GET / HTTP/1.1\r\nUser-Agent: AutobahnTestSuite/0.7.6-0.10.9\r\nHost: technikempire.com:80\r\nUpgrade: WebSocket\r\nConnection: Upgrade\r\nPragma: no-cache\r\nCache-Control: no-cache\r\nSec-WebSocket-Key: +W9ej/0OMTG/yh0TZ5YbzA==\r\nSec-WebSocket-Version: 13\r\n\r\n",
+   "httpResponse": "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nDate: Wed, 18 Apr 2018 00:57:38 GMT\r\nServer: Kestrel\r\nUpgrade: websocket\r\nSec-WebSocket-Accept: KCbZVNGpgtpy/di9IePeK1wtti4=\r\n\r\n",
+   "id": "9.3.9",
+   "isServer": false,
+   "localCloseCode": 1000,
+   "localCloseReason": null,
+   "received": [],
+   "remoteCloseCode": 1000,
+   "remoteCloseReason": null,
+   "reportCompressionRatio": false,
+   "reportTime": true,
+   "result": "Received text message of length 4194304.",
+   "resultClose": "Connection was properly closed",
+   "rxFrameStats": {
+      "0": 1036,
+      "1": 1,
+      "8": 1
+   },
+   "rxOctetStats": {
+      "4": 1,
+      "183": 1,
+      "5560": 1,
+      "8212": 1,
+      "8480": 2,
+      "8760": 1,
+      "9072": 1,
+      "9076": 1,
+      "10220": 1,
+      "11316": 1,
+      "12300": 2,
+      "14604": 1,
+      "14940": 1,
+      "16060": 2,
+      "16120": 1,
+      "16400": 4,
+      "18140": 1,
+      "20472": 1,
+      "22926": 1,
+      "23396": 1,
+      "23700": 1,
+      "24540": 1,
+      "24552": 1,
+      "25404": 1,
+      "26280": 1,
+      "27740": 1,
+      "28000": 1,
+      "28980": 1,
+      "29200": 1,
+      "31900": 1,
+      "32162": 1,
+      "37940": 1,
+      "41378": 1,
+      "42340": 1,
+      "45040": 1,
+      "45260": 1,
+      "45324": 1,
+      "47908": 1,
+      "48640": 1,
+      "49200": 1,
+      "51100": 1,
+      "53364": 1,
+      "55662": 1,
+      "58300": 1,
+      "58860": 1,
+      "65536": 44
+   },
+   "started": "2018-04-18T00:57:39.557Z",
+   "trafficStats": null,
+   "txFrameStats": {
+      "1": 1,
+      "8": 1
+   },
+   "txOctetStats": {
+      "8": 1,
+      "246": 1,
+      "4194318": 1
+   },
+   "wasClean": true,
+   "wasCloseHandshakeTimeout": false,
+   "wasNotCleanReason": null,
+   "wasOpenHandshakeTimeout": false,
+   "wasServerConnectionDropTimeout": false,
+   "wirelog": [
+      [
+         "TO",
+         [
+            246,
+            "474554202f20485454502f312e310d0a557365722d4167656e743a204175746f6261686e5465737453756974652f302e372e362d302e31302e390d0a486f7374 ..."
+         ],
+         false
+      ],
+      [
+         "RO",
+         [
+            183,
+            "485454502f312e312031303120537769746368696e672050726f746f636f6c730d0a436f6e6e656374696f6e3a20557067726164650d0a446174653a20576564 ..."
+         ]
+      ],
+      [
+         "TI",
+         100
+      ],
+      [
+         "TF",
+         [
+            2,
+            "0x03e8"
+         ],
+         8,
+         true,
+         0,
+         "80c091f1",
+         null,
+         null,
+         false
+      ],
+      [
+         "TO",
+         [
+            8,
+            "888280c091f18328"
+         ],
+         false
+      ],
+      [
+         "RO",
+         [
+            4,
+            "880203e8"
+         ]
+      ],
+      [
+         "RF",
+         [
+            2,
+            "0x03e8"
+         ],
+         8,
+         true,
+         0,
+         false,
+         null
+      ]
+   ]
+}

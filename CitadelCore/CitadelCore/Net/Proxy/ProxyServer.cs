@@ -5,7 +5,9 @@
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+using CitadelCore.Crypto;
 using CitadelCore.Diversion;
+using CitadelCore.Logging;
 using CitadelCore.Net.ConnectionAdapters;
 using CitadelCore.Net.Handlers;
 using Microsoft.AspNetCore.Builder;
@@ -25,16 +27,7 @@ namespace CitadelCore.Net.Proxy
     /// The ProxyServer class holds the core, platform-independent filtering proxy logic. 
     /// </summary>
     public abstract class ProxyServer
-    {
-        // This will handle SNI and handshaking.
-        private TlsSniConnectionAdapter m_tlsConnAdapter = new TlsSniConnectionAdapter();
-
-        private IPEndPoint m_v4HttpListenerEp = new IPEndPoint(IPAddress.Any, 0);
-        private IPEndPoint m_v4HttpsListenerEp = new IPEndPoint(IPAddress.Any, 0);
-
-        private IPEndPoint m_v6HttpListenerEp = new IPEndPoint(IPAddress.IPv6Any, 0);
-        private IPEndPoint m_v6HttpsListenerEp = new IPEndPoint(IPAddress.IPv6Any, 0);
-
+    { 
         /// <summary>
         /// List of proxying web servers generated for this host. Currently there's always going to
         /// be two, one for IPV4 and one for IPV6.
@@ -43,16 +36,16 @@ namespace CitadelCore.Net.Proxy
 
         private IDiverter m_diverter;
 
+        private TlsSniConnectionAdapter m_tlsConnAdapter = new TlsSniConnectionAdapter();
+
         /// <summary>
         /// Gets the IPV4 endpoint where HTTP connections are being received. This will be ANY:0
         /// until Start has been called.
         /// </summary>
         public IPEndPoint V4HttpEndpoint
         {
-            get
-            {
-                return m_v4HttpListenerEp;
-            }
+            private set;
+            get;
         }
 
         /// <summary>
@@ -61,10 +54,8 @@ namespace CitadelCore.Net.Proxy
         /// </summary>
         public IPEndPoint V4HttpsEndpoint
         {
-            get
-            {
-                return m_v4HttpsListenerEp;
-            }
+            private set;
+            get;
         }
 
         /// <summary>
@@ -73,10 +64,8 @@ namespace CitadelCore.Net.Proxy
         /// </summary>
         public IPEndPoint V6HttpEndpoint
         {
-            get
-            {
-                return m_v6HttpListenerEp;
-            }
+            private set;
+            get;
         }
 
         /// <summary>
@@ -85,10 +74,8 @@ namespace CitadelCore.Net.Proxy
         /// </summary>
         public IPEndPoint V6HttpsEndpoint
         {
-            get
-            {
-                return m_v6HttpsListenerEp;
-            }
+            private set;
+            get;
         }
 
         /// <summary>
@@ -138,24 +125,9 @@ namespace CitadelCore.Net.Proxy
         /// </exception>
         public ProxyServer(FirewallCheckCallback firewallCallback, MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback)
         {
-            if(firewallCallback == null)
-            {
-                throw new ArgumentException("The firewall callback MUST be defined.");
-            }
-
-            if(messageBeginCallback == null)
-            {
-                throw new ArgumentException("The message begin callback MUST be defined.");
-            }
-
-            if(messageEndCallback == null)
-            {
-                throw new ArgumentException("The message end callback MUST be defined.");
-            }
-            
-            m_fwCallback = firewallCallback;
-            FilterResponseHandlerFactory.Default.MessageBeginCallback = messageBeginCallback;
-            FilterResponseHandlerFactory.Default.MessageEndCallback = messageEndCallback;            
+            m_fwCallback = firewallCallback ?? throw new ArgumentException("The firewall callback MUST be defined.");
+            FilterResponseHandlerFactory.Default.MessageBeginCallback = messageBeginCallback ?? throw new ArgumentException("The message begin callback MUST be defined.");
+            FilterResponseHandlerFactory.Default.MessageEndCallback = messageEndCallback ?? throw new ArgumentException("The message end callback MUST be defined.");            
         }
 
         /// <summary>
@@ -177,10 +149,10 @@ namespace CitadelCore.Net.Proxy
                 };
 
                 m_diverter = CreateDiverter(
-                        m_v4HttpListenerEp,
-                        m_v4HttpsListenerEp,
-                        m_v6HttpListenerEp,
-                        m_v6HttpsListenerEp
+                        V4HttpEndpoint,
+                        V4HttpsEndpoint,
+                        V6HttpEndpoint,
+                        V6HttpsEndpoint
                     );
 
                 m_diverter.ConfirmDenyFirewallAccess = (procPath) =>
@@ -257,31 +229,37 @@ namespace CitadelCore.Net.Proxy
 
             ListenOptions httpListenOptions = null;
             ListenOptions httpsListenOptions = null;
-            
-            ipWebhostBuilder.UseLibuv(opts =>
+
+            ipWebhostBuilder.UseSockets(opts =>
             {
-                opts.ThreadCount = Environment.ProcessorCount;
+                opts.IOQueueCount = 0;
             });
 
             // Use Kestrel server.
             ipWebhostBuilder.UseKestrel(opts =>
-            {
-
+            {   
                 opts.Limits.MaxRequestBodySize = null;
                 opts.Limits.MaxRequestBufferSize = null;
                 opts.Limits.MaxConcurrentConnections = null;
                 opts.Limits.MaxConcurrentUpgradedConnections = null;                
-                
+
                 // Listen for HTTPS connections. Keep a reference to the options object so we can get
                 // the chosen port number after we call start.
                 opts.Listen(isV6 ? IPAddress.IPv6Any : IPAddress.Any, 0, listenOpts =>
                 {
+
                     // Plug in our TLS connection adapter. This adapter will handle SNI parsing and
                     // certificate spoofing based on the SNI value.
                     listenOpts.ConnectionAdapters.Add(m_tlsConnAdapter);
 
                     // Who doesn't love to kick that old Nagle to the curb?
                     listenOpts.NoDelay = true;
+
+                    // HTTP 2 got cut last minute from 2.1 and MS speculates that it may
+                    // take several releases to get it properly included.
+                    // https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456
+                    listenOpts.Protocols = HttpProtocols.Http1;
+                    
                     httpsListenOptions = listenOpts;
                 });
 
@@ -289,8 +267,14 @@ namespace CitadelCore.Net.Proxy
                 // the chosen port number after we call start.
                 opts.Listen(isV6 ? IPAddress.IPv6Any : IPAddress.Any, 0, listenOpts =>
                 {
-                    // Who doesn't love to kick that old Nagle to the curb?
+                    // Who doesn't love to kick that old Nagle to the curb?                    
                     listenOpts.NoDelay = true;
+
+                    // HTTP 2 got cut last minute from 2.1 and MS speculates that it may
+                    // take several releases to get it properly included.
+                    // https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456
+                    listenOpts.Protocols = HttpProtocols.Http1;
+
                     httpListenOptions = listenOpts;
                 });
             });
@@ -309,13 +293,13 @@ namespace CitadelCore.Net.Proxy
             // Since this is post vHost.Start(), we can now grab the EP of the connection.
             if(isV6)
             {
-                m_v6HttpListenerEp = httpListenOptions.IPEndPoint;
-                m_v6HttpsListenerEp = httpsListenOptions.IPEndPoint;
+                V6HttpEndpoint = httpListenOptions.IPEndPoint;
+                V6HttpsEndpoint = httpsListenOptions.IPEndPoint;
             }
             else
             {
-                m_v4HttpListenerEp = httpListenOptions.IPEndPoint;
-                m_v4HttpsListenerEp = httpsListenOptions.IPEndPoint;
+                V4HttpEndpoint = httpListenOptions.IPEndPoint;
+                V4HttpsEndpoint = httpsListenOptions.IPEndPoint;
             }
 
             return vHost;
@@ -335,25 +319,31 @@ namespace CitadelCore.Net.Proxy
             public void Configure(IApplicationBuilder app)
             {
                 // We proxy websockets, so enable this.
+                var wsOpts = new WebSocketOptions();
+                wsOpts.ReceiveBufferSize = (int)(ushort.MaxValue * 5);                
                 app.UseWebSockets();
-                
+
                 // Exception handler. Not yet sure what to do here.
                 app.UseExceptionHandler(
                     options =>
-                    {
+                    {   
                         options.Run(
                             async context =>
                             {
-                                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                                context.Response.ContentType = "text/html";
-
-                                var ex = context.Features.Get<IExceptionHandlerFeature>();
-
-                                if(ex != null)
+                                try
                                 {
-                                    var err = $"<h1>Error: {ex.Error.Message}</h1>{ex.Error.StackTrace }";
-                                    await context.Response.WriteAsync(err).ConfigureAwait(false);
+                                    context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                                    context.Response.ContentType = "text/html";
+
+                                    var ex = context.Features.Get<IExceptionHandlerFeature>();
+
+                                    if (ex != null)
+                                    {
+                                        var err = $"<h1>Error: {ex.Error.Message}</h1>{ex.Error.StackTrace }";
+                                        await context.Response.WriteAsync(err).ConfigureAwait(false);
+                                    }
                                 }
+                                catch { }
                             }
                         );
                     }
@@ -367,7 +357,7 @@ namespace CitadelCore.Net.Proxy
                 {   
                     return Task.Run(async () =>
                     {
-                        var handler = FilterResponseHandlerFactory.Default.GetHandler(context);
+                        var handler = FilterResponseHandlerFactory.Default.GetHandler(context);                        
                         await handler.Handle(context);
                     });
                 });

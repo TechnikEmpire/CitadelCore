@@ -192,7 +192,7 @@ namespace CitadelCore.Crypto
         /// Whether or not to overwrite. If true, any and all certificates in the host OS store with
         /// a matching subject name will be deleted before the supplied certificate is installed.
         /// </param>
-        public static void InstallCertificateInHostOsTrustStore(X509Certificate certificate, bool overwrite = false)
+        private static void InstallCertificateInHostOsTrustStore(X509Certificate certificate, bool overwrite = false)
         {
             switch(Environment.OSVersion.Platform)
             {
@@ -226,7 +226,7 @@ namespace CitadelCore.Crypto
         /// <param name="certificate">
         /// The certificate who's subject name to use for matching certificates that need to be removed. 
         /// </param>
-        public static void UninstallCertificateInHostOsTrustStore(X509Certificate certificate)
+        private static void UninstallCertificateInHostOsTrustStore(X509Certificate certificate)
         {
             switch(Environment.OSVersion.Platform)
             {

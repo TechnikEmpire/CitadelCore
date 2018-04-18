@@ -45,11 +45,20 @@ namespace CitadelCore.Net.ConnectionAdapters
         /// <summary>
         /// Permitted TLS protocols. 
         /// </summary>
-        //private static readonly SslProtocols s_allowedTlsProtocols = SslProtocols.Tls11 | SslProtocols.Tls12;
+        /// <remarks>
+        /// We enable weak/bad protocols here because some clients in the world still like to use
+        /// completely compromised encryption. For example, I once saw a company who's banking
+        /// application still uses SSL3 to transfer vast sums of money automatically to and from the
+        /// business. The application was not coded to use any newer protocol. So, while they are
+        /// dirty, they are NOT enabled on the upstream end, so if anything, we're doing clients a
+        /// favour here because the upstream connection will get seamlessly upgraded to standard/safe
+        /// protocols while the bad client can still function.
+        /// </remarks>
         private static readonly SslProtocols s_allowedTlsProtocols = SslProtocols.Ssl2 | SslProtocols.Ssl3 | SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12;
 
         public TlsSniConnectionAdapter()
         {
+            LoggerProxy.Default.Error(nameof(TlsSniConnectionAdapter));
             m_certStore = new SpoofedCertStore();
         }
 
@@ -60,90 +69,100 @@ namespace CitadelCore.Net.ConnectionAdapters
 
         private async Task<IAdaptedConnection> InnerOnConnectionAsync(ConnectionAdapterContext context)
         {
-            // We start off by handing the connection stream off to a library that can do a peek read
-            // (which is really just doing buffering tricks, not an actual peek read).
-            var yourClientStream = new CustomBufferedStream(context.ConnectionStream, 4096);
-
-            // We then use the same lib to parse the "peeked" data and extract the SNI hostname.
-            var clientSslHelloInfo = await SslTools.PeekClientHello(yourClientStream);
-
-            switch(clientSslHelloInfo != null)
+            try
             {
-                case true:
+                // We start off by handing the connection stream off to a library that can do a peek
+                // read (which is really just doing buffering tricks, not an actual peek read).
+                var yourClientStream = new CustomBufferedStream(context.ConnectionStream, 4096);
+
+                // We then use the same lib to parse the "peeked" data and extract the SNI hostname.
+                var clientSslHelloInfo = await SslTools.PeekClientHello(yourClientStream);
+
+                switch (clientSslHelloInfo != null)
                 {
-                    string sniHost = clientSslHelloInfo.Extensions?.FirstOrDefault(x => x.Name == "server_name")?.Data;
+                    case true:
+                        {
+                            string sniHost = clientSslHelloInfo.Extensions?.FirstOrDefault(x => x.Name == "server_name")?.Data;
 
-                    if(string.IsNullOrEmpty(sniHost) || string.IsNullOrWhiteSpace(sniHost))
-                    {
-                        LoggerProxy.Default.Error("Failed to extract SNI hostname.");
-                        return s_closedConnection;
-                    }
-
-                    try
-                    {
-                        var sslStream = new SslStream(yourClientStream, true,
-                            (object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors) =>
+                            if (string.IsNullOrEmpty(sniHost) || string.IsNullOrWhiteSpace(sniHost))
                             {
-                                // TODO - Handle client certificates. They should be pushed to the
-                                // upstream connection eventually.
-                                if(certificate != null)
+                                return s_closedConnection;
+                            }
+
+                            LoggerProxy.Default.Info(string.Format("SNI Hostname: {0}", sniHost));
+
+                            try
+                            {
+                                var sslStream = new SslStream(yourClientStream, true,
+                                    (object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors) =>
+                                    {
+                                        // TODO - Handle client certificates. They should be pushed
+                                        // to the upstream connection eventually.
+                                        if (certificate != null)
+                                        {
+                                            
+                                        }
+
+                                        return true;
+                                    }
+                                    );
+
+                                // Spoof a cert for the extracted SNI hostname.
+                                var spoofedCert = m_certStore.GetSpoofedCertificateForHost(sniHost);
+
+                                try
                                 {
-                                    LoggerProxy.Default.Info("CLIENT CERTIFICATE AVAILABLE!!!!!!!!!!!!!");
+                                    // Try to handshake.
+                                    await sslStream.AuthenticateAsServerAsync(spoofedCert, false, s_allowedTlsProtocols, true);
+                                }
+                                catch (OperationCanceledException oe)
+                                {
+                                    LoggerProxy.Default.Error("Failed to complete client TLS handshake because the operation was cancelled.");
+
+                                    LoggerProxy.Default.Error(oe);
+
+                                    sslStream.Dispose();
+                                    return null;
+                                }
+                                catch (IOException ex)
+                                {
+                                    LoggerProxy.Default.Error("Failed to complete client TLS handshake because of IO exception.");
+
+                                    LoggerProxy.Default.Error(ex);
+
+                                    sslStream.Dispose();
+                                    return null;
                                 }
 
-                                return true;
+                                // Always set the feature even though the cert might be null
+                                context.Features.Set<ITlsConnectionFeature>(new TlsConnectionFeature
+                                {
+                                    ClientCertificate = sslStream.RemoteCertificate != null ? sslStream.RemoteCertificate.ToV2Certificate() : null
+                                });
+
+                                return new HttpsAdaptedConnection(sslStream);
                             }
-                            );
+                            catch (Exception err)
+                            {
+                                LoggerProxy.Default.Error("Failed to complete client TLS handshake because of unknown exception.");
+                                LoggerProxy.Default.Error(err);
+                            }
 
-                        // Spoof a cert for the extracted SNI hostname.
-                        var spoofedCert = m_certStore.GetSpoofedCertificateForHost(sniHost);
-
-                        try
-                        {
-                            // Try to handshake.
-                            await sslStream.AuthenticateAsServerAsync(spoofedCert, false, s_allowedTlsProtocols, false);
+                            return null;
                         }
-                        catch(OperationCanceledException oe)
+
+                    default:
                         {
-                            LoggerProxy.Default.Error("Failed to complete client TLS handshake because the operation was cancelled.");
-
-                            LoggerProxy.Default.Error(oe);
-
-                            sslStream.Dispose();
+                            LoggerProxy.Default.Error("No client hello!");
                             return s_closedConnection;
                         }
-                        catch(IOException ex)
-                        {
-                            LoggerProxy.Default.Error("Failed to complete client TLS handshake because of IO exception.");
-
-                            LoggerProxy.Default.Error(ex);
-
-                            sslStream.Dispose();
-                            return s_closedConnection;
-                        }
-
-                        // Always set the feature even though the cert might be null
-                        context.Features.Set<ITlsConnectionFeature>(new TlsConnectionFeature
-                        {
-                            ClientCertificate = sslStream.RemoteCertificate != null ? sslStream.RemoteCertificate.ToV2Certificate() : null
-                        });
-
-                        return new HttpsAdaptedConnection(sslStream);
-                    }
-                    catch(Exception err)
-                    {
-                        LoggerProxy.Default.Error("Failed to complete client TLS handshake because of unknown exception.");
-
-                        LoggerProxy.Default.Error(err);
-                    }
-
-                    return s_closedConnection;
                 }
+            }
+            catch (Exception err)
+            {
+                LoggerProxy.Default.Error(err);
 
-                default:
-                {
-                    return s_closedConnection;
-                }
+                return s_closedConnection;
             }
         }
 
@@ -152,7 +171,7 @@ namespace CitadelCore.Net.ConnectionAdapters
             private readonly SslStream _sslStream;
 
             public HttpsAdaptedConnection(SslStream sslStream)
-            {
+            {   
                 _sslStream = sslStream;
             }
 
