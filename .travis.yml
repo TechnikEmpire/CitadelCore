@@ -1,3 +1,8 @@
+language: csharp
+mono: none
+dotnet: 2.1.105
+solution: CitadelCore.sln
+script: dotnet clean && dotnet build --configuration Release
 env:
   global:
    # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
@@ -13,6 +18,6 @@ addons:
       name: "TechnikEmpire/CitadelCore"
       description: ".NET proxy server core logic."
     notification_email: info@technikempire.com
-    build_command_prepend: "msbuild /t:Clean"
-    build_command: "msbuild /t:Rebuild"
+    build_command_prepend: "dotnet clean"
+    build_command: "dotnet build --configuration Release"
     branch_pattern: coverity_scan
