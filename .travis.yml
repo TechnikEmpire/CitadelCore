@@ -1,0 +1,18 @@
+env:
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+   - secure: "jEGgi50ru+0LClVtMeyqDjWa82uSPyVdXP1GLgk/TqZScyhe2dRsoTiey8TmEMthrvOrZH3Eljg2997p/jL2cThvSnPoHSiI/b7ffCYLlC1CkrliMgoJdpbp8fqRRogAbFIgJcyO79CY/dMqI8zE663A4pHKf7iV6Wz5FCmqV+YKl06tH64sh1kj9JM3SQCZW6b0t9OspmmamzCtwN0udqZ+ZlUUnuCdgaoyA5Fb1IAQHjUMs4bDBf/mURTQaM+fHtimILl+Co9PNqI2+Hwe1rMkLQpTffqigBXzzKvfhzxREVmxViz+S5JA4auQR9rNvDdXse5sXrk0hTjpQOPJHCfN0BB2S1DC8Zy86Hmlw4e7ah4Ao+IPsgFQV0s7lf0ntTz7QGq7XUGLIhZYP+7FK0emtgQ0x/KoIDG+1pjA82YIlxOePCtXtugtBlYDpGlflVy3JpEPxpPJJQzP0G7SymyIs/MI+JrzeOtTw2S0qYZSPXpnIap8mvgarH8pezmHC2lEYEckkX0JecqKfbdsrXnxL9pF4xVCuM5T7hETFovLvOBcnsO4UBskUbd2x5DhMA+5MGEJbKON1VDSoB1OkCUoVMlAMnxq+6iKZWZUny4Lr7Zhsaffdmy66Q4c1U08eAFXGyBAXzO8EN14G4+/rLfa6SrHZhz/nJcDqTv0Z1Q="
+
+before_install:
+  - echo -n | openssl s_client -connect https://scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
+
+addons:
+  coverity_scan:
+    project:
+      name: "TechnikEmpire/CitadelCore"
+      description: ".NET proxy server core logic."
+    notification_email: info@technikempire.com
+    build_command_prepend: "msbuild /t:Clean"
+    build_command: "msbuild /t:Rebuild"
+    branch_pattern: coverity_scan
