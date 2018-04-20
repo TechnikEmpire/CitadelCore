@@ -4,21 +4,17 @@ dotnet: 2.1.105
 solution: CitadelCore.sln
 env:
   global:
-   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
-   #   via the "travis encrypt" command using the project repo's public key
-   - secure: W/LY3gMg/UVABa8tho3KJ/nOt94KZZokb7dYgKMaiu9It1I2ns9J1LayMMdI23wDs8UKjUNEoDgVGZhhgaFN+fJA6vYKkUpKV/DZBDZlSFKJhiLuChP5TEQ3RSJOqzkhARN1TyLDBbLZ6DNYTVHsT27YtLurKKqQFUZnwXRC+x/z+1e2kaYeztggxLwKcpuKf2FQEwVSVHipMtdaIMkK2sVkcTsgsu7kl0Q6W/05EJKipVtMrxCPHeLONZ0QygXeXoYx9VaTAL2B9A9nTmwBhquc7Tess15cW8EF723WZjMO9iPEnqnbMWrmC3mfOw8IA/SJ/fWyW6gcLOXkuA9VWpt5EIQTc39H41D2ugAEPkkHD11J65UPY2mlThKfoPajjzhG6Jh91JQPoB1qQrSNIpTgm5PrkYdrA6zRkiJIGFwGhJKnL5tGvs9wvVf/rrp4qu+q16at0+K+xNsNP6CQ+Rcr98zyh7AOEMa/sJvV9KaU5SoRSVEU6oFEuC4Nq33s3qAzvZyMn6Co6FARmRoR9lGnBz6xdz1Q9iIwGpKSfFoABYQUVZmMWqKB6ARSiNTiywvMp5SsxMgf0asfc1kE49uRXYwf1kGvtWBB7FC2i8tevnIvFcGWLfhKrICluvC6hHLN8ezxytV3Y6mp70/jYoq8bHOfkZtshWmJuLHkCGE=
-
+    secure: Bi6j2/XzkvqRLcJQx9J6QUo4AnqGeuylEcb5fRDTEIiozwAcpyyj/2jw6KEHdDkgXmk1Hu/QUw1BCkLXUmlpgt0SeiEjUOiHG9cZnPYetzQeLXsG1QaE7gz86SF9ErUiduw3CdzMmrhJe3bdr6Fg5YU+evXPTd73lJMLPhj6d6RGge7LrxRPRs22mXWNM+7nYp44AoQax7iCjdFl07kY3M+3qQnkE6sszwb743YSicHuMP6BYn+NPY09Dk2BwQdFLB1I2bOaEPOf53Un/OZnolYIHMCdawuSw90g2CGuXFfc54NguSHjw54en0Gy46W5xzTvOVVMS88FE0r47n7okBQLzj5E7XGMYqrVqtno/nczrVyE3zEx7cBi/s0C1KbjNxRuCXnDBIGXbNtOrWchWy8JdKop1a2qCpaijEa8a9wPxAiHUtra+/nc52Uhkd9es6KRc/p+wLV2XOvBFg8cBReIR0z5NQnm3ZzgpdgUsxR7turofvZIEcsFm7JKqDsdkXGOwLREzi9X9fl2CPO20jk071jXCkVzGsM+CMO3iM/dO2QmQx1CS4Cqis+S5/2chgDIRfLwTcNmasf0Acwr5y8wln+scND7UHEM76jfjNnjGtF4qY8Vz+vl9xJoGbM9alJTs2LqrcVyEAi1jaq6yRLC+NotZFAL4I0gXRgy+f0=
 before_install:
-  - echo -n | openssl s_client -connect https://scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
-
+- echo -n | openssl s_client -connect https://scan.coverity.com:443 | sed -ne '/-BEGIN
+  CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
 addons:
   coverity_scan:
     project:
-      name: "TechnikEmpire/CitadelCore"
+      name: TechnikEmpire/CitadelCore
       description: ".NET proxy server core logic."
     notification_email: info@technikempire.com
-    build_command_prepend: "dotnet clean"
-    build_command: "dotnet build --configuration Release"
+    build_command_prepend: dotnet clean
+    build_command: dotnet build --configuration Release
     branch_pattern: coverity_scan
-
 script: dotnet clean && dotnet build --configuration Release
