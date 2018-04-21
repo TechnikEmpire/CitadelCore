@@ -11,3 +11,5 @@ For the Windows specific implementation, please see [CitadelCore.Windows](https:
        src="https://scan.coverity.com/projects/15514/badge.svg"/>
 </a>
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/79dbc8edcb3a413eafc84d0e506342e0)](https://www.codacy.com/app/TechnikEmpire/CitadelCore?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=TechnikEmpire/CitadelCore&amp;utm_campaign=Badge_Grade)
+![NugetLinkBadge](https://img.shields.io/nuget/v/CitadelCore.svg)
+![NugetDownloadsBadge](https://img.shields.io/nuget/dt/CitadelCore.svg)  
