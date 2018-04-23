@@ -21,6 +21,14 @@ namespace CitadelCore.Net.Http
         /// </summary>
         private static readonly HashSet<string> s_forbidden = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
+            // Inherit QUIC/Google custom compression stuff, prevent
+            // pinning related headers etc. All imported from
+            // ForbiddenHttpHeaders.
+            "X-SDHC",
+            "Avail-Dictionary",
+            "Public-Key-Pins",
+            "Public-Key-Pins-Report-Only",
+
             // Our client websocket might not be the same as our server websocket. In 
             // .NET Standard 2.0 for example, the Kestrel client websocket is a completely
             // different class than the ClientWebSocket class.

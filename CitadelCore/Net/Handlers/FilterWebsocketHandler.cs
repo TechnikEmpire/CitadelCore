@@ -86,17 +86,14 @@ namespace CitadelCore.Net.Handlers
                 var reqHeaderBuilder = new StringBuilder();
                 foreach(var hdr in context.Request.Headers)
                 {
-                    if(!ForbiddenHttpHeaders.IsForbidden(hdr.Key))
+                    if(!ForbiddenWsHeaders.IsForbidden(hdr.Key))
                     {
                         reqHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, hdr.Value.ToString());
 
                         try
                         {
-                            if(!ForbiddenWsHeaders.IsForbidden(hdr.Key))
-                            {
-                                wsServer.Options.SetRequestHeader(hdr.Key, hdr.Value.ToString());
-                                Console.WriteLine("Set Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
-                            }
+                            wsServer.Options.SetRequestHeader(hdr.Key, hdr.Value.ToString());
+                            Console.WriteLine("Set Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
                         }
                         catch(Exception hdrException)
                         {

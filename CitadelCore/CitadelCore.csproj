@@ -48,6 +48,7 @@ Fixes two bugs in websocket bridge code.</PackageReleaseNotes>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <DocumentationFile>bin\Release\netstandard2.0\CitadelCore.xml</DocumentationFile>
+    <DefineConstants>TRACE;RELEASE;NETSTANDARD2_0</DefineConstants>
   </PropertyGroup>
   
   <ItemGroup>

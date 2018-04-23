@@ -2,19 +2,11 @@ language: csharp
 mono: none
 dotnet: 2.1.105
 solution: CitadelCore.sln
-script: dotnet clean && dotnet build --configuration Release
 env:
   global:
-    secure: vZ64z6nQtqW7IjTJv5+g4mRW2FfntZIslAxWYVZfugUkssinqkvJ6xtTTvgXu3mynZel06hxvCclpoI4xqVsZWRhjbmaLR/hsvlosJ3SOUJxaxUhh/jpUehNz42sLwg+4WcQDRTsJbqP2t4NHcsB3+S9mw6vK6tuROoVekcwVLuMbJCYu4HOPe+V/7/laUwXbZatCg9Kcsc0+NJF6K5fhW0d4fF78p5DhBZ42IKJzfzleJb5G37zZ1M/ZKyvbW40GkkmpYrj7QwvDGuWtKwb2E8LFvO8V+jfHSpw8jnZ9RThDnhVbSTtv1jHvNuAESrdOcfBQQ4QlE0zOJx7T3Dys1SePP7zRQ3q8IFr7w2WgVmYFgdlgXTmCdAWpVfwTXJ6bUa2E7XnrNnDuvmFOO7qnBwM5yEYBAnAX7wDA9Q2JGfKQ6krUnjcvmcLpOqOumagqWg3OMfb3FyUB+hkx11Gv+JFvEyURC/MNnD9JLS8xomcPTd32ObgFk9y7zQ6YLJqSscaxbxgrtdIRWEm8Bv74B3KalrI4IK0iYrpoKjk18vkK0K4qrGn0RuHSxgcRZTpxK5BdFbEvGm8b3UOgM/BTWjZNx5Ruh6SnDTgwJuAAenrIbW6yKgWmaRXbwZCJyQSZ1z/kSMEKi3BNVPfFtQYQR6Vs9qfgIZJzV6KMV3AITM=
+    secure: Bi6j2/XzkvqRLcJQx9J6QUo4AnqGeuylEcb5fRDTEIiozwAcpyyj/2jw6KEHdDkgXmk1Hu/QUw1BCkLXUmlpgt0SeiEjUOiHG9cZnPYetzQeLXsG1QaE7gz86SF9ErUiduw3CdzMmrhJe3bdr6Fg5YU+evXPTd73lJMLPhj6d6RGge7LrxRPRs22mXWNM+7nYp44AoQax7iCjdFl07kY3M+3qQnkE6sszwb743YSicHuMP6BYn+NPY09Dk2BwQdFLB1I2bOaEPOf53Un/OZnolYIHMCdawuSw90g2CGuXFfc54NguSHjw54en0Gy46W5xzTvOVVMS88FE0r47n7okBQLzj5E7XGMYqrVqtno/nczrVyE3zEx7cBi/s0C1KbjNxRuCXnDBIGXbNtOrWchWy8JdKop1a2qCpaijEa8a9wPxAiHUtra+/nc52Uhkd9es6KRc/p+wLV2XOvBFg8cBReIR0z5NQnm3ZzgpdgUsxR7turofvZIEcsFm7JKqDsdkXGOwLREzi9X9fl2CPO20jk071jXCkVzGsM+CMO3iM/dO2QmQx1CS4Cqis+S5/2chgDIRfLwTcNmasf0Acwr5y8wln+scND7UHEM76jfjNnjGtF4qY8Vz+vl9xJoGbM9alJTs2LqrcVyEAi1jaq6yRLC+NotZFAL4I0gXRgy+f0=
 before_install:
 - echo -n | openssl s_client -connect https://scan.coverity.com:443 | sed -ne '/-BEGIN
   CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
-addons:
-  coverity_scan:
-    project:
-      name: TechnikEmpire/CitadelCore
-      description: ".NET proxy server core logic."
-    notification_email: info@technikempire.com
-    build_command_prepend: dotnet clean
-    build_command: dotnet build --configuration Release
-    branch_pattern: coverity_scan
+
+script: dotnet clean && dotnet build --configuration Release
