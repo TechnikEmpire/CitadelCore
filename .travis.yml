@@ -8,13 +8,5 @@ env:
 before_install:
 - echo -n | openssl s_client -connect https://scan.coverity.com:443 | sed -ne '/-BEGIN
   CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
-addons:
-  coverity_scan:
-    project:
-      name: TechnikEmpire/CitadelCore
-      description: ".NET proxy server core logic."
-    notification_email: info@technikempire.com
-    build_command_prepend: dotnet clean
-    build_command: dotnet build --configuration Release
-    branch_pattern: coverity_scan
+
 script: dotnet clean && dotnet build --configuration Release
