@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright © 2017 Jesse Nicholson
+* Copyright © 2017-Present Jesse Nicholson
 * This Source Code Form is subject to the terms of the Mozilla Public
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -78,9 +78,8 @@ namespace CitadelCore.Net.Handlers
 
                 // Next we need to try and parse the URL as a URI, because the websocket client
                 // requires this for connecting upstream.
-                Uri reqUrl = null;
 
-                if(!Uri.TryCreate(fullUrl, UriKind.RelativeOrAbsolute, out reqUrl))
+                if (!Uri.TryCreate(fullUrl, UriKind.RelativeOrAbsolute, out Uri reqUrl))
                 {
                     LoggerProxy.Default.Error("Failed to parse HTTP URL.");
                     return;
@@ -126,8 +125,8 @@ namespace CitadelCore.Net.Handlers
 
                     if(!requestMsg.Headers.TryAddWithoutValidation(hdr.Key, hdr.Value.ToString()))
                     {
-                        string hName = hdr.Key != null ? hdr.Key : string.Empty;
-                        string hValue = hdr.Value.ToString() != null ? hdr.Value.ToString() : string.Empty;
+                        string hName = hdr.Key ?? string.Empty;
+                        string hValue = hdr.Value.ToString() ?? string.Empty;
 
                         if(hName.Length > 0 && hValue.Length > 0)
                         {

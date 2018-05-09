@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright © 2017 Jesse Nicholson
+* Copyright © 2017-Present Jesse Nicholson
 * This Source Code Form is subject to the terms of the Mozilla Public
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -49,14 +49,19 @@ namespace CitadelCore.Crypto
         /// </summary>
         private X509Certificate m_caCertificate;
 
-        private object m_genLock = new object();
+        private readonly object m_genLock = new object();
 
         /// <summary>
         /// Constructs a new certificate store instance. 
         /// </summary>
-        public SpoofedCertStore()
+        /// <param name="authorityCommonName">
+        /// The common name to use when generating the certificate authority. Basically, all SSL
+        /// sites will show that they are secured by a certificate authority with this name that is
+        /// supplied here.
+        /// </param>
+        public SpoofedCertStore(string authorityCommonName)
         {
-            GenerateSelfSignedCertificate();
+            GenerateSelfSignedCertificate(authorityCommonName);
             EstablishOsTrust();
         }
 
@@ -73,9 +78,8 @@ namespace CitadelCore.Crypto
         {   
             lock(m_genLock)
             {
-                System.Security.Cryptography.X509Certificates.X509Certificate2 cloned = null;
 
-                if(m_certificates.TryGetValue(host, out cloned))
+                if (m_certificates.TryGetValue(host, out System.Security.Cryptography.X509Certificates.X509Certificate2 cloned))
                 {
                     return cloned;
                 }
@@ -129,7 +133,12 @@ namespace CitadelCore.Crypto
         /// <summary>
         /// Generates a self signed certificate for this store to be able to issue cloned certs. 
         /// </summary>
-        private void GenerateSelfSignedCertificate()
+        /// <param name="authorityCommonName">
+        /// The common name to use when generating the certificate authority. Basically, all SSL
+        /// sites will show that they are secured by a certificate authority with this name that is
+        /// supplied here.
+        /// </param>
+        private void GenerateSelfSignedCertificate(string authorityCommonName)
         {
             var kpg = new ECKeyPairGenerator();
             kpg.Init(new KeyGenerationParameters(new SecureRandom(), 256));
@@ -155,7 +164,7 @@ namespace CitadelCore.Crypto
             };
             */
 
-            X509Name dnName = new X509Name("CN=Citadel Core");
+            X509Name dnName = new X509Name(string.Format("CN={0}", authorityCommonName));
             certGen.SetSerialNumber(serialNumber);
             certGen.SetIssuerDN(dnName);
             certGen.SetNotBefore(startDate);

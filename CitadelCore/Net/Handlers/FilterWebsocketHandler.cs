@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright © 2017 Jesse Nicholson
+* Copyright © 2017-Present Jesse Nicholson
 * This Source Code Form is subject to the terms of the Mozilla Public
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -34,6 +34,9 @@ namespace CitadelCore.Net.Handlers
 
         public override async Task Handle(HttpContext context)
         {
+            ClientWebSocket wsServer = null;
+            System.Net.WebSockets.WebSocket wsClient = null;
+
             try
             {
                 // First we need the URL for this connection, since it's been requested to be upgraded to
@@ -52,16 +55,15 @@ namespace CitadelCore.Net.Handlers
 
                 // Next we need to try and parse the URL as a URI, because the websocket client requires
                 // this for connecting upstream.
-                Uri wsUri = null;
 
-                if(!Uri.TryCreate(fullUrl, UriKind.RelativeOrAbsolute, out wsUri))
+                if (!Uri.TryCreate(fullUrl, UriKind.RelativeOrAbsolute, out Uri wsUri))
                 {
                     LoggerProxy.Default.Error("Failed to parse websocket URI.");
                     return;
                 }
 
                 // Create the websocket that's going to connect to the remote server.
-                ClientWebSocket wsServer = new ClientWebSocket();
+                wsServer = new ClientWebSocket();
                 wsServer.Options.Cookies = new System.Net.CookieContainer();
                 wsServer.Options.SetBuffer((int)ushort.MaxValue * 16, (int)ushort.MaxValue * 16);
 
@@ -113,7 +115,7 @@ namespace CitadelCore.Net.Handlers
                 LoggerProxy.Default.Info(String.Format("Connected websocket to {0}", wsUri.AbsoluteUri));
 
                 // Create, via acceptor, the client websocket. This is the local machine's websocket.
-                var wsClient = await context.WebSockets.AcceptWebSocketAsync(wsServer.SubProtocol ?? null);
+                wsClient = await context.WebSockets.AcceptWebSocketAsync(wsServer.SubProtocol ?? null);
 
                 ProxyNextAction nxtAction = ProxyNextAction.AllowAndIgnoreContentAndResponse;
                 string customResponseContentType = string.Empty;
@@ -129,7 +131,7 @@ namespace CitadelCore.Net.Handlers
 
                             }
 
-                            await wsClient.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
+                            await wsClient.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);                            
                             return;
                         }
                 }
@@ -152,7 +154,7 @@ namespace CitadelCore.Net.Handlers
 
                             if(!wsClient.CloseStatus.HasValue)
                             {
-                                serverStatus = await wsServer.ReceiveAsync(new ArraySegment<byte>(serverBuffer), context.RequestAborted);
+                                serverStatus = await wsServer.ReceiveAsync(new ArraySegment<byte>(serverBuffer), context.RequestAborted);                                
                                 continue;
                             }
 
@@ -235,6 +237,20 @@ namespace CitadelCore.Net.Handlers
                     }
                 }
                 LoggerProxy.Default.Error(wshe);
+            }
+            finally
+            {
+                if(wsClient != null)
+                {
+                    wsClient.Dispose();
+                    wsClient = null;
+                }
+
+                if (wsServer != null)
+                {
+                    wsServer.Dispose();
+                    wsServer = null;
+                }
             }
         }
     }

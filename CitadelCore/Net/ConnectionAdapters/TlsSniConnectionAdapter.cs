@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright © 2017 Jesse Nicholson
+* Copyright © 2017-Present Jesse Nicholson
 * This Source Code Form is subject to the terms of the Mozilla Public
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -11,8 +11,10 @@ using CitadelCore.Logging;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Adapter.Internal;
 using StreamExtended;
+using StreamExtended.Models;
 using StreamExtended.Network;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Security;
@@ -40,12 +42,12 @@ namespace CitadelCore.Net.ConnectionAdapters
         /// <summary>
         /// Returned whenever we're forcing the connection closed, due to error. 
         /// </summary>
-        private static ClosedAdaptedConnection s_closedConnection = new ClosedAdaptedConnection();
+        private static readonly ClosedAdaptedConnection s_closedConnection = new ClosedAdaptedConnection();
 
         /// <summary>
         /// Permitted TLS protocols. 
         /// </summary>
-        /// <remarks>
+        /// <remarks>        
         /// We enable weak/bad protocols here because some clients in the world still like to use
         /// completely compromised encryption. For example, I once saw a company who's banking
         /// application still uses SSL3 to transfer vast sums of money automatically to and from the
@@ -56,10 +58,17 @@ namespace CitadelCore.Net.ConnectionAdapters
         /// </remarks>
         private static readonly SslProtocols s_allowedTlsProtocols = SslProtocols.Ssl2 | SslProtocols.Ssl3 | SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12;
 
-        public TlsSniConnectionAdapter()
-        {
-            LoggerProxy.Default.Error(nameof(TlsSniConnectionAdapter));
-            m_certStore = new SpoofedCertStore();
+        /// <summary>
+        /// Constructs a new TslSniConnectionAdapater instance.
+        /// </summary>
+        /// <param name="authorityCommonName">
+        /// The common name to use when generating the certificate authority. Basically, all SSL
+        /// sites will show that they are secured by a certificate authority with this name that is
+        /// supplied here.
+        /// </param>
+        public TlsSniConnectionAdapter(string authorityCommonName)
+        {   
+            m_certStore = new SpoofedCertStore(authorityCommonName);
         }
 
         public Task<IAdaptedConnection> OnConnectionAsync(ConnectionAdapterContext context)
@@ -137,7 +146,7 @@ namespace CitadelCore.Net.ConnectionAdapters
                                 // Always set the feature even though the cert might be null
                                 context.Features.Set<ITlsConnectionFeature>(new TlsConnectionFeature
                                 {
-                                    ClientCertificate = sslStream.RemoteCertificate != null ? sslStream.RemoteCertificate.ToV2Certificate() : null
+                                    ClientCertificate = sslStream.RemoteCertificate?.ToV2Certificate()
                                 });
 
                                 return new HttpsAdaptedConnection(sslStream);
