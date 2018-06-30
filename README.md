@@ -5,7 +5,7 @@ CitadelCore supports proxying of both HTTP/S and Websocket (Ws/Wss) connections.
 
 Note that CitadelCore is an abstract library by design. Since the proxy is designed to be run as a local, transparent filtering proxy, a platform-specific mechanism for diverting traffic back into the proxy must be implemented on each platform. All other logic is implemented in this library. 
 
-In short, that means this library bundles a [full-fledge, compliant HTTP/S web server](https://github.com/aspnet/KestrelHttpServer) and has handlers that bridge (aka proxy) those webserver requests to the real upstream target. At various stages of transactions in that pipline, exposed callbacks are invoked enabling users to perform deep content inspection, connection filtering, and content modification.
+In short, that means this library bundles a [full-fledged, compliant HTTP/S web server](https://github.com/aspnet/KestrelHttpServer) and has handlers that bridge (aka proxy) those webserver requests to the real upstream target. At various stages of transactions in that pipline, exposed callbacks are invoked enabling users to perform deep content inspection, connection filtering, and content modification.
 
 For the Windows specific implementation, please see [CitadelCore.Windows](https://github.com/TechnikEmpire/CitadelCore.Windows).
 
