@@ -6,6 +6,7 @@
 */
 
 using CitadelCore.Diversion;
+using CitadelCore.Logging;
 using CitadelCore.Net.ConnectionAdapters;
 using CitadelCore.Net.Handlers;
 using Microsoft.AspNetCore.Builder;
@@ -16,6 +17,8 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
 namespace CitadelCore.Net.Proxy
@@ -135,6 +138,9 @@ namespace CitadelCore.Net.Proxy
             m_fwCallback = firewallCallback ?? throw new ArgumentException("The firewall callback MUST be defined.");
             FilterResponseHandlerFactory.Default.MessageBeginCallback = messageBeginCallback ?? throw new ArgumentException("The message begin callback MUST be defined.");
             FilterResponseHandlerFactory.Default.MessageEndCallback = messageEndCallback ?? throw new ArgumentException("The message end callback MUST be defined.");
+
+            // Hook the cert verification callback.
+            ServicePointManager.ServerCertificateValidationCallback = CertificateVerificationHandler;
         }
 
         /// <summary>
@@ -223,6 +229,68 @@ namespace CitadelCore.Net.Proxy
         }
 
         /// <summary>
+        /// Handles client certification verification.
+        /// </summary>
+        /// <param name="sender">
+        /// Sender. Ignored.
+        /// </param>
+        /// <param name="certificate">
+        /// The certificate to verify.
+        /// </param>
+        /// <param name="chain">
+        /// The certificate chain.
+        /// </param>
+        /// <param name="sslPolicyErrors">
+        /// Errors detected during preverification.
+        /// </param>
+        /// <returns>
+        /// True if the certificate was verified, false otherwise.
+        /// </returns>
+        protected virtual bool CertificateVerificationHandler(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
+        {
+            if (sslPolicyErrors != SslPolicyErrors.None)
+            {
+                try
+                {
+                    // We will tolerate certain chain status issues, such as a failure
+                    // to reach the CRL server.
+                    int acceptable = 0;
+                    foreach (var element in chain.ChainStatus)
+                    {
+                        switch (element.Status)
+                        {
+                            case X509ChainStatusFlags.OfflineRevocation:
+                            case X509ChainStatusFlags.RevocationStatusUnknown:
+                                {
+                                    // We're not going to break websites for people just because the designated
+                                    // CRL is offline.
+                                    ++acceptable;
+                                }
+                                break;
+                        }
+                    }
+
+                    // If, and ONLY IF, all of our existing errors are acceptable, we will adjust the chain
+                    // verification to tolerate those errors and re-run the chain building process.
+                    if (acceptable > 0 && acceptable == chain.ChainStatus.Length)
+                    {
+                        chain.ChainPolicy.VerificationFlags = X509VerificationFlags.IgnoreCertificateAuthorityRevocationUnknown | X509VerificationFlags.IgnoreCtlSignerRevocationUnknown | X509VerificationFlags.IgnoreEndRevocationUnknown | X509VerificationFlags.IgnoreRootRevocationUnknown;
+                        var asX2 = new X509Certificate2(certificate);
+                        return chain.Build(asX2);
+                    }
+                }
+                catch (Exception err)
+                {
+                    LoggerProxy.Default.Error(err);
+                }
+
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Creates a web server that will bind to local addresses to any available port. 
         /// </summary>
         /// <param name="isV6">
@@ -270,8 +338,8 @@ namespace CitadelCore.Net.Proxy
                     listenOpts.NoDelay = true;
 
                     // HTTP 2 got cut last minute from 2.1 and MS speculates that it may take several
-                    // releases to get it properly included. https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456
-                    listenOpts.Protocols = HttpProtocols.Http1;
+                    // releases to get it properly included. https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456                    
+                    // listenOpts.Protocols = HttpProtocols.Http1;
 
                     httpsListenOptions = listenOpts;
                 });
@@ -285,7 +353,7 @@ namespace CitadelCore.Net.Proxy
 
                     // HTTP 2 got cut last minute from 2.1 and MS speculates that it may take several
                     // releases to get it properly included. https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456
-                    listenOpts.Protocols = HttpProtocols.Http1;
+                    // listenOpts.Protocols = HttpProtocols.Http1;
 
                     httpListenOptions = listenOpts;
                 });
@@ -293,12 +361,12 @@ namespace CitadelCore.Net.Proxy
 
             // Add compression for responses.
             ipWebhostBuilder.ConfigureServices(serviceOpts =>
-            {
+            {   
                 serviceOpts.AddResponseCompression();
             });
 
             ipWebhostBuilder.Configure(cfgApp =>
-            {
+            {   
                 cfgApp.UseResponseCompression();
             });
 

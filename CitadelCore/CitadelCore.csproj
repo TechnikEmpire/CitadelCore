@@ -12,12 +12,12 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/TechnikEmpire/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>This release does nothing but constrain the StreamExtended dependency version, since newer releases are broken at the time of this writing.</PackageReleaseNotes>
+    <PackageReleaseNotes>Upgrade depends to .NET core 2.1 release.</PackageReleaseNotes>
     <Summary>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Summary>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>2.2.3</Version>
-    <AssemblyVersion>2.2.3.0</AssemblyVersion>
-    <FileVersion>2.2.3.0</FileVersion>    
+    <Version>2.2.4</Version>
+    <AssemblyVersion>2.2.4.0</AssemblyVersion>
+    <FileVersion>2.2.4.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">
@@ -49,9 +49,9 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Diagnostics" Version="2.1.0-preview2-final" />
-    <PackageReference Include="Microsoft.AspNetCore.ResponseCompression" Version="2.0.3" />
-    <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.1.0-preview2-final" />
+    <PackageReference Include="Microsoft.AspNetCore.Diagnostics" Version="2.1.1" />
+    <PackageReference Include="Microsoft.AspNetCore.ResponseCompression" Version="2.1.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.WebSockets.Server" Version="0.1.0" />
     <PackageReference Include="Portable.BouncyCastle" Version="1.8.2" />
     <PackageReference Include="StreamExtended" Version="[1.0.81]" />

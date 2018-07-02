@@ -15,6 +15,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -145,6 +146,9 @@ namespace CitadelCore.Net.Handlers
                     upstreamReqVersionMatch = Version.Parse(match.Value);
                     requestMsg.Version = upstreamReqVersionMatch;
                 }
+
+                // For later reference...
+                bool upstreamIsHttp1 = upstreamReqVersionMatch != null && upstreamReqVersionMatch.Major == 1 && upstreamReqVersionMatch.Minor == 0;
 
                 // Add trailing CRLF to the request headers string.
                 reqHeaderBuilder.Append("\r\n");
@@ -279,6 +283,8 @@ namespace CitadelCore.Net.Handlers
 
                 bool responseHasZeroContentLength = false;
 
+                bool responseIsFixedLength = false;
+
                 // Iterate over all upstream response headers. Note that response.Content.Headers is
                 // not ALL headers. Headers are split up into different properties according to
                 // logical grouping.
@@ -286,9 +292,14 @@ namespace CitadelCore.Net.Handlers
                 {
                     try
                     {
-                        if(hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && hdr.Value.ToString().Equals("0"))
+                        if(hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
                         {
-                            responseHasZeroContentLength = true;
+                            responseIsFixedLength = true;
+
+                            if (hdr.Value.ToString().Equals("0"))
+                            {
+                                responseHasZeroContentLength = true;
+                            }
                         }
                     }
                     catch { }
@@ -320,9 +331,14 @@ namespace CitadelCore.Net.Handlers
                 {
                     try
                     {
-                        if(hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && hdr.Value.ToString().Equals("0"))
+                        if (hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
                         {
-                            responseHasZeroContentLength = true;
+                            responseIsFixedLength = true;
+
+                            if (hdr.Value.ToString().Equals("0"))
+                            {
+                                responseHasZeroContentLength = true;
+                            }
                         }
                     }
                     catch { }
@@ -412,11 +428,11 @@ namespace CitadelCore.Net.Handlers
                                 // not try to write a body, even if present, if the status is 204.
                                 // Kestrel will not let us do this, and so far I can't find a way to
                                 // remove this technically correct strict-compliance.
-                                if(responseBody.Length > 0 && context.Response.StatusCode != 204)
+                                if(!responseHasZeroContentLength && (responseBody.Length > 0 && context.Response.StatusCode != 204))
                                 {
                                     // If the request is HTTP1.0, we need to pull all the data so we
                                     // can properly set the content-length by adding the header in.
-                                    if(upstreamReqVersionMatch != null && upstreamReqVersionMatch.Major == 1 && upstreamReqVersionMatch.Minor == 0)
+                                    if(upstreamIsHttp1)
                                     {
                                         context.Response.Headers.Add("Content-Length", responseBody.Length.ToString());
                                     }
@@ -442,9 +458,9 @@ namespace CitadelCore.Net.Handlers
                 // If we made it here, then the user just wants to let the response be streamed in
                 // without any inspection etc, so do exactly that.
 
-                using(var responseStream = await response.Content.ReadAsStreamAsync())
+                using (var responseStream = await response.Content.ReadAsStreamAsync())
                 {
-                    if(upstreamReqVersionMatch != null && upstreamReqVersionMatch.Major == 1 && upstreamReqVersionMatch.Minor == 0)
+                    if(!responseHasZeroContentLength && (upstreamIsHttp1 || responseIsFixedLength))
                     {
                         using(var ms = new MemoryStream())
                         {
