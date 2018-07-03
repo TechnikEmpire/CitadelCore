@@ -15,7 +15,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -54,14 +53,15 @@ namespace CitadelCore.Net.Handlers
             // We need UseCookies set to false here. We then need to set per-request cookies by
             // manually adding the "Cookie" header. If we don't have UseCookies set to false here,
             // this will not work.
-            HttpClientHandler handler = new HttpClientHandler()
+            var handler = new HttpClientHandler()
             {
                 AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
                 UseCookies = false,
+                ClientCertificateOptions = ClientCertificateOption.Automatic,
                 AllowAutoRedirect = false,
                 Proxy = null
             };
-            
+
             s_client = new HttpClient(handler);
         }
 
@@ -89,7 +89,7 @@ namespace CitadelCore.Net.Handlers
                 // Create a new request to send out upstream.
                 var requestMsg = new HttpRequestMessage(new HttpMethod(context.Request.Method), fullUrl);
 
-                if(context.Connection.ClientCertificate != null)
+                if (context.Connection.ClientCertificate != null)
                 {
                     // TODO - Handle client certificates.
                 }
@@ -102,11 +102,11 @@ namespace CitadelCore.Net.Handlers
                 bool requestHasZeroContentLength = false;
 
                 // Clone headers from the real client request to our upstream HTTP request.
-                foreach(var hdr in context.Request.Headers)
+                foreach (var hdr in context.Request.Headers)
                 {
                     try
                     {
-                        if(hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && hdr.Value.ToString().Equals("0"))
+                        if (hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && hdr.Value.ToString().Equals("0"))
                         {
                             requestHasZeroContentLength = true;
                         }
@@ -119,17 +119,17 @@ namespace CitadelCore.Net.Handlers
                     }
                     catch { }
 
-                    if(ForbiddenHttpHeaders.IsForbidden(hdr.Key))
+                    if (ForbiddenHttpHeaders.IsForbidden(hdr.Key))
                     {
                         continue;
                     }
 
-                    if(!requestMsg.Headers.TryAddWithoutValidation(hdr.Key, hdr.Value.ToString()))
+                    if (!requestMsg.Headers.TryAddWithoutValidation(hdr.Key, hdr.Value.ToString()))
                     {
                         string hName = hdr.Key ?? string.Empty;
                         string hValue = hdr.Value.ToString() ?? string.Empty;
 
-                        if(hName.Length > 0 && hValue.Length > 0)
+                        if (hName.Length > 0 && hValue.Length > 0)
                         {
                             failedInitialHeaders.Add(new Tuple<string, string>(hName, hValue));
                         }
@@ -141,7 +141,7 @@ namespace CitadelCore.Net.Handlers
                 Version upstreamReqVersionMatch = null;
 
                 Match match = s_httpVerRegex.Match(context.Request.Protocol);
-                if(match != null && match.Success)
+                if (match != null && match.Success)
                 {
                     upstreamReqVersionMatch = Version.Parse(match.Value);
                     requestMsg.Version = upstreamReqVersionMatch;
@@ -160,9 +160,9 @@ namespace CitadelCore.Net.Handlers
                 byte[] requestBlockResponse = null;
                 m_msgBeginCb?.Invoke(reqUrl, reqHeaderBuilder.ToString(), m_nullBody, context.Request.IsHttps ? MessageType.Https : MessageType.Http, MessageDirection.Request, out requestNextAction, out requestBlockResponseContentType, out requestBlockResponse);
 
-                if(requestNextAction == ProxyNextAction.DropConnection)
+                if (requestNextAction == ProxyNextAction.DropConnection)
                 {
-                    if(requestBlockResponse != null)
+                    if (requestBlockResponse != null)
                     {
                         // User wants to block this request with a custom response.
                         await DoCustomResponse(context, requestBlockResponseContentType, requestBlockResponse);
@@ -177,18 +177,18 @@ namespace CitadelCore.Net.Handlers
                 }
 
                 // Get the request body into memory.
-                using(var ms = new MemoryStream())
+                using (var ms = new MemoryStream())
                 {
                     await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(context.Request.Body, ms, null, context.RequestAborted);
 
                     var requestBody = ms.ToArray();
 
                     // If we don't have a body, there's no sense in calling the message end callback.
-                    if(requestBody.Length > 0)
+                    if (requestBody.Length > 0)
                     {
                         // We have a body and the user previously instructed us to give them the
                         // content, if any, for inspection.
-                        if(requestNextAction == ProxyNextAction.AllowButRequestContentInspection)
+                        if (requestNextAction == ProxyNextAction.AllowButRequestContentInspection)
                         {
                             // We'll now call the message end function for the request side.
                             bool shouldBlockRequest = false;
@@ -196,11 +196,11 @@ namespace CitadelCore.Net.Handlers
                             requestBlockResponse = null;
                             m_msgEndCb?.Invoke(reqUrl, reqHeaderBuilder.ToString(), requestBody, context.Request.IsHttps ? MessageType.Https : MessageType.Http, MessageDirection.Request, out shouldBlockRequest, out requestBlockResponseContentType, out requestBlockResponse);
 
-                            if(shouldBlockRequest)
+                            if (shouldBlockRequest)
                             {
                                 // User wants to block this request after inspecting the content.
 
-                                if(requestBlockResponse != null)
+                                if (requestBlockResponse != null)
                                 {
                                     // User wants to block this request with a custom response.
                                     await DoCustomResponse(context, requestBlockResponseContentType, requestBlockResponse);
@@ -226,7 +226,7 @@ namespace CitadelCore.Net.Handlers
                     }
                     else
                     {
-                        if(requestHasZeroContentLength)
+                        if (requestHasZeroContentLength)
                         {
                             requestMsg.Content = new ByteArrayContent(requestBody);
                             requestMsg.Content.Headers.Clear();
@@ -237,13 +237,13 @@ namespace CitadelCore.Net.Handlers
 
                 // Ensure that content type is set properly because ByteArrayContent and friends will
                 // modify these fields.
-                foreach(var et in failedInitialHeaders)
+                foreach (var et in failedInitialHeaders)
                 {
-                    if(!requestMsg.Headers.TryAddWithoutValidation(et.Item1, et.Item2))
+                    if (!requestMsg.Headers.TryAddWithoutValidation(et.Item1, et.Item2))
                     {
-                        if(requestMsg.Content != null)
+                        if (requestMsg.Content != null)
                         {
-                            if(!requestMsg.Content.Headers.TryAddWithoutValidation(et.Item1, et.Item2))
+                            if (!requestMsg.Content.Headers.TryAddWithoutValidation(et.Item1, et.Item2))
                             {
                                 LoggerProxy.Default.Warn(string.Format("Failed to add HTTP header with key {0} and with value {1}.", et.Item1, et.Item2));
                             }
@@ -262,12 +262,12 @@ namespace CitadelCore.Net.Handlers
                 {
                     response = await s_client.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     LoggerProxy.Default.Error(e);
                 }
 
-                if(response == null)
+                if (response == null)
                 {
                     return;
                 }
@@ -288,46 +288,7 @@ namespace CitadelCore.Net.Handlers
                 // Iterate over all upstream response headers. Note that response.Content.Headers is
                 // not ALL headers. Headers are split up into different properties according to
                 // logical grouping.
-                foreach(var hdr in response.Content.Headers)
-                {
-                    try
-                    {
-                        if(hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
-                        {
-                            responseIsFixedLength = true;
-
-                            if (hdr.Value.ToString().Equals("0"))
-                            {
-                                responseHasZeroContentLength = true;
-                            }
-                        }
-                    }
-                    catch { }
-
-                    try
-                    {
-                        resHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, string.Join(", ", hdr.Value));
-                    }
-                    catch { }
-
-                    if(ForbiddenHttpHeaders.IsForbidden(hdr.Key))
-                    {
-                        continue;
-                    }
-
-                    try
-                    {
-                        context.Response.Headers.Add(hdr.Key, new Microsoft.Extensions.Primitives.StringValues(hdr.Value.ToArray()));
-                    }
-                    catch(Exception e)
-                    {
-                        LoggerProxy.Default.Error(e);
-                    }
-                }
-
-                // As mentioned above, headers are split up into different properties. We need to now
-                // clone over the generic headers.
-                foreach(var hdr in response.Headers)
+                foreach (var hdr in response.Content.Headers)
                 {
                     try
                     {
@@ -349,7 +310,7 @@ namespace CitadelCore.Net.Handlers
                     }
                     catch { }
 
-                    if(ForbiddenHttpHeaders.IsForbidden(hdr.Key))
+                    if (ForbiddenHttpHeaders.IsForbidden(hdr.Key))
                     {
                         continue;
                     }
@@ -358,7 +319,46 @@ namespace CitadelCore.Net.Handlers
                     {
                         context.Response.Headers.Add(hdr.Key, new Microsoft.Extensions.Primitives.StringValues(hdr.Value.ToArray()));
                     }
-                    catch(Exception e)
+                    catch (Exception e)
+                    {
+                        LoggerProxy.Default.Error(e);
+                    }
+                }
+
+                // As mentioned above, headers are split up into different properties. We need to now
+                // clone over the generic headers.
+                foreach (var hdr in response.Headers)
+                {
+                    try
+                    {
+                        if (hdr.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
+                        {
+                            responseIsFixedLength = true;
+
+                            if (hdr.Value.ToString().Equals("0"))
+                            {
+                                responseHasZeroContentLength = true;
+                            }
+                        }
+                    }
+                    catch { }
+
+                    try
+                    {
+                        resHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, string.Join(", ", hdr.Value));
+                    }
+                    catch { }
+
+                    if (ForbiddenHttpHeaders.IsForbidden(hdr.Key))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        context.Response.Headers.Add(hdr.Key, new Microsoft.Extensions.Primitives.StringValues(hdr.Value.ToArray()));
+                    }
+                    catch (Exception e)
                     {
                         LoggerProxy.Default.Error(e);
                     }
@@ -368,7 +368,7 @@ namespace CitadelCore.Net.Handlers
 
                 // Now that we have response headers, let's call the message begin handler for the
                 // response. Unless of course, the user has asked us NOT to do this.
-                if(requestNextAction != ProxyNextAction.AllowAndIgnoreContentAndResponse)
+                if (requestNextAction != ProxyNextAction.AllowAndIgnoreContentAndResponse)
                 {
                     ProxyNextAction responseNextAction = ProxyNextAction.AllowAndIgnoreContent;
                     string responseBlockResponseContentType = string.Empty;
@@ -376,9 +376,9 @@ namespace CitadelCore.Net.Handlers
 
                     m_msgBeginCb?.Invoke(reqUrl, resHeaderBuilder.ToString(), m_nullBody, context.Request.IsHttps ? MessageType.Https : MessageType.Http, MessageDirection.Response, out responseNextAction, out responseBlockResponseContentType, out responseBlockResponse);
 
-                    if(responseNextAction == ProxyNextAction.DropConnection)
+                    if (responseNextAction == ProxyNextAction.DropConnection)
                     {
-                        if(responseBlockResponse != null)
+                        if (responseBlockResponse != null)
                         {
                             // User wants to block this response with a custom response.
                             await DoCustomResponse(context, responseBlockResponseContentType, responseBlockResponse);
@@ -390,11 +390,11 @@ namespace CitadelCore.Net.Handlers
                         }
                     }
 
-                    if(responseNextAction == ProxyNextAction.AllowButRequestContentInspection)
+                    if (responseNextAction == ProxyNextAction.AllowButRequestContentInspection)
                     {
-                        using(var upstreamResponseStream = await response.Content.ReadAsStreamAsync())
+                        using (var upstreamResponseStream = await response.Content.ReadAsStreamAsync())
                         {
-                            using(var ms = new MemoryStream())
+                            using (var ms = new MemoryStream())
                             {
                                 await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(upstreamResponseStream, ms, null, context.RequestAborted);
 
@@ -405,9 +405,9 @@ namespace CitadelCore.Net.Handlers
                                 responseBlockResponse = null;
                                 m_msgEndCb?.Invoke(reqUrl, resHeaderBuilder.ToString(), responseBody, context.Request.IsHttps ? MessageType.Https : MessageType.Http, MessageDirection.Response, out shouldBlockResponse, out responseBlockResponseContentType, out responseBlockResponse);
 
-                                if(shouldBlockResponse)
+                                if (shouldBlockResponse)
                                 {
-                                    if(responseBlockResponse != null)
+                                    if (responseBlockResponse != null)
                                     {
                                         // User wants to block this response with a custom response.
                                         await DoCustomResponse(context, responseBlockResponseContentType, responseBlockResponse);
@@ -428,11 +428,11 @@ namespace CitadelCore.Net.Handlers
                                 // not try to write a body, even if present, if the status is 204.
                                 // Kestrel will not let us do this, and so far I can't find a way to
                                 // remove this technically correct strict-compliance.
-                                if(!responseHasZeroContentLength && (responseBody.Length > 0 && context.Response.StatusCode != 204))
+                                if (!responseHasZeroContentLength && (responseBody.Length > 0 && context.Response.StatusCode != 204))
                                 {
                                     // If the request is HTTP1.0, we need to pull all the data so we
                                     // can properly set the content-length by adding the header in.
-                                    if(upstreamIsHttp1)
+                                    if (upstreamIsHttp1)
                                     {
                                         context.Response.Headers.Add("Content-Length", responseBody.Length.ToString());
                                     }
@@ -441,7 +441,7 @@ namespace CitadelCore.Net.Handlers
                                 }
                                 else
                                 {
-                                    if(responseHasZeroContentLength)
+                                    if (responseHasZeroContentLength)
                                     {
                                         context.Response.Headers.Add("Content-Length", "0");
                                     }
@@ -460,9 +460,9 @@ namespace CitadelCore.Net.Handlers
 
                 using (var responseStream = await response.Content.ReadAsStreamAsync())
                 {
-                    if(!responseHasZeroContentLength && (upstreamIsHttp1 || responseIsFixedLength))
+                    if (!responseHasZeroContentLength && (upstreamIsHttp1 || responseIsFixedLength))
                     {
-                        using(var ms = new MemoryStream())
+                        using (var ms = new MemoryStream())
                         {
                             await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(responseStream, ms, null, context.RequestAborted);
 
@@ -475,7 +475,7 @@ namespace CitadelCore.Net.Handlers
                     }
                     else
                     {
-                        if(responseHasZeroContentLength)
+                        if (responseHasZeroContentLength)
                         {
                             context.Response.Headers.Add("Content-Length", "0");
                         }
@@ -486,9 +486,9 @@ namespace CitadelCore.Net.Handlers
                     }
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
-                if(!(e is TaskCanceledException) && !(e is OperationCanceledException))
+                if (!(e is TaskCanceledException) && !(e is OperationCanceledException))
                 {
                     // Ignore task cancelled exceptions.
                     LoggerProxy.Default.Error(e);
@@ -497,10 +497,10 @@ namespace CitadelCore.Net.Handlers
         }
 
         /// <summary>
-        /// Will put a 204 response into the context. Nothing more. 
+        /// Will put a 204 response into the context. Nothing more.
         /// </summary>
         /// <param name="context">
-        /// The request context. 
+        /// The request context.
         /// </param>
         private void Do204(HttpContext context)
         {
@@ -510,30 +510,30 @@ namespace CitadelCore.Net.Handlers
         }
 
         /// <summary>
-        /// Will write the content to the response stream. 
+        /// Will write the content to the response stream.
         /// </summary>
         /// <param name="context">
-        /// The request context. 
+        /// The request context.
         /// </param>
         /// <param name="contentType">
-        /// The content type for the data we're going to write as a response. 
+        /// The content type for the data we're going to write as a response.
         /// </param>
         /// <param name="customResponseBody">
-        /// The raw response content. 
+        /// The raw response content.
         /// </param>
         /// <returns>
-        /// A task just cuz tbh fam smh. 
+        /// A task just cuz tbh fam smh.
         /// </returns>
         private async Task DoCustomResponse(HttpContext context, string contentType, byte[] customResponseBody)
         {
-            using(var ms = new MemoryStream(customResponseBody))
+            using (var ms = new MemoryStream(customResponseBody))
             {
                 ms.Position = 0;
                 context.Response.Headers.Clear();
                 context.Response.StatusCode = 200;
                 context.Response.Headers.Add("Expires", new Microsoft.Extensions.Primitives.StringValues(s_EpochHttpDateTime));
                 context.Response.ContentType = contentType;
-                
+
                 await ms.CopyToAsync(context.Response.Body, 4096, context.RequestAborted);
             }
         }

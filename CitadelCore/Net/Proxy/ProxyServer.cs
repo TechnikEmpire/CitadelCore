@@ -140,7 +140,7 @@ namespace CitadelCore.Net.Proxy
             FilterResponseHandlerFactory.Default.MessageEndCallback = messageEndCallback ?? throw new ArgumentException("The message end callback MUST be defined.");
 
             // Hook the cert verification callback.
-            ServicePointManager.ServerCertificateValidationCallback = CertificateVerificationHandler;
+            ServicePointManager.ServerCertificateValidationCallback += CertificateVerificationHandler;
         }
 
         /// <summary>
