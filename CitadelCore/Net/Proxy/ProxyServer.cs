@@ -5,6 +5,7 @@
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+using CitadelCore.Crypto;
 using CitadelCore.Diversion;
 using CitadelCore.Logging;
 using CitadelCore.Net.ConnectionAdapters;
@@ -134,13 +135,27 @@ namespace CitadelCore.Net.Proxy
         /// </exception>
         public ProxyServer(string authorityCommonName, FirewallCheckCallback firewallCallback, MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback)
         {
-            m_tlsConnAdapter = new TlsSniConnectionAdapter(authorityCommonName);
+            m_tlsConnAdapter = new TlsSniConnectionAdapter(CreateCertificateStore(authorityCommonName));
             m_fwCallback = firewallCallback ?? throw new ArgumentException("The firewall callback MUST be defined.");
             FilterResponseHandlerFactory.Default.MessageBeginCallback = messageBeginCallback ?? throw new ArgumentException("The message begin callback MUST be defined.");
             FilterResponseHandlerFactory.Default.MessageEndCallback = messageEndCallback ?? throw new ArgumentException("The message end callback MUST be defined.");
 
             // Hook the cert verification callback.
             ServicePointManager.ServerCertificateValidationCallback += CertificateVerificationHandler;
+        }
+
+        /// <summary>
+        /// </summary>
+        /// <param name="authorityCommonName">
+        /// The common name to use when generating the certificate authority. Basically, all SSL
+        /// sites will show that they are secured by a certificate authority with this name that is
+        /// supplied here.
+        /// </param>
+        /// <returns>
+        /// </returns>
+        protected virtual ISpoofedCertificateStore CreateCertificateStore(string authorityCommonName)
+        {
+            return new SpoofedCertStore(authorityCommonName);
         }
 
         /// <summary>

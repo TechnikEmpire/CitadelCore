@@ -49,7 +49,7 @@ namespace CitadelCore.Net.Handlers
             ServicePointManager.CheckCertificateRevocationList = true;
             ServicePointManager.ReusePort = true;
             ServicePointManager.UseNagleAlgorithm = false;
-
+            
             // We need UseCookies set to false here. We then need to set per-request cookies by
             // manually adding the "Cookie" header. If we don't have UseCookies set to false here,
             // this will not work.
@@ -61,7 +61,7 @@ namespace CitadelCore.Net.Handlers
                 AllowAutoRedirect = false,
                 Proxy = null
             };
-
+            
             s_client = new HttpClient(handler);
         }
 

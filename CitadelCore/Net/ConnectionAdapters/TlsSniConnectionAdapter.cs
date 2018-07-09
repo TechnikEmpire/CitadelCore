@@ -37,7 +37,7 @@ namespace CitadelCore.Net.ConnectionAdapters
         /// <summary>
         /// Holds our certificate store. This is responsible for spoofing, storing and retrieving TLS certificates.
         /// </summary>
-        private SpoofedCertStore m_certStore;
+        private ISpoofedCertificateStore m_certStore;
 
         /// <summary>
         /// Returned whenever we're forcing the connection closed, due to error. 
@@ -61,14 +61,12 @@ namespace CitadelCore.Net.ConnectionAdapters
         /// <summary>
         /// Constructs a new TslSniConnectionAdapater instance.
         /// </summary>
-        /// <param name="authorityCommonName">
-        /// The common name to use when generating the certificate authority. Basically, all SSL
-        /// sites will show that they are secured by a certificate authority with this name that is
-        /// supplied here.
+        /// <param name="store">
+        /// The certificate store to use for spoofing certificates.
         /// </param>
-        public TlsSniConnectionAdapter(string authorityCommonName)
-        {   
-            m_certStore = new SpoofedCertStore(authorityCommonName);
+        public TlsSniConnectionAdapter(ISpoofedCertificateStore store)
+        {
+            m_certStore = store;
         }
 
         public Task<IAdaptedConnection> OnConnectionAsync(ConnectionAdapterContext context)

@@ -27,7 +27,7 @@ namespace CitadelCore.Crypto
     /// <summary>
     /// The SpoofedCertStore class establishes operating system trust. 
     /// </summary>
-    internal class SpoofedCertStore
+    internal class SpoofedCertStore : ISpoofedCertificateStore
     {
         /// <summary>
         /// Dictionary that keeps all generated, cloned certificates issued by our fake CA. 
