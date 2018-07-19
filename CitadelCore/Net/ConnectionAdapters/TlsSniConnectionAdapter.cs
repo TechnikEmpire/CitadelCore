@@ -11,10 +11,8 @@ using CitadelCore.Logging;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Adapter.Internal;
 using StreamExtended;
-using StreamExtended.Models;
 using StreamExtended.Network;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Security;
@@ -37,17 +35,17 @@ namespace CitadelCore.Net.ConnectionAdapters
         /// <summary>
         /// Holds our certificate store. This is responsible for spoofing, storing and retrieving TLS certificates.
         /// </summary>
-        private ISpoofedCertificateStore m_certStore;
+        private ISpoofedCertificateStore _certStore;
 
         /// <summary>
-        /// Returned whenever we're forcing the connection closed, due to error. 
+        /// Returned whenever we're forcing the connection closed, due to error.
         /// </summary>
         private static readonly ClosedAdaptedConnection s_closedConnection = new ClosedAdaptedConnection();
 
         /// <summary>
-        /// Permitted TLS protocols. 
+        /// Permitted TLS protocols.
         /// </summary>
-        /// <remarks>        
+        /// <remarks>
         /// We enable weak/bad protocols here because some clients in the world still like to use
         /// completely compromised encryption. For example, I once saw a company who's banking
         /// application still uses SSL3 to transfer vast sums of money automatically to and from the
@@ -66,7 +64,7 @@ namespace CitadelCore.Net.ConnectionAdapters
         /// </param>
         public TlsSniConnectionAdapter(ISpoofedCertificateStore store)
         {
-            m_certStore = store;
+            _certStore = store;
         }
 
         public Task<IAdaptedConnection> OnConnectionAsync(ConnectionAdapterContext context)
@@ -96,8 +94,6 @@ namespace CitadelCore.Net.ConnectionAdapters
                                 return s_closedConnection;
                             }
 
-                            LoggerProxy.Default.Info(string.Format("SNI Hostname: {0}", sniHost));
-
                             try
                             {
                                 var sslStream = new SslStream(yourClientStream, true,
@@ -107,7 +103,6 @@ namespace CitadelCore.Net.ConnectionAdapters
                                         // to the upstream connection eventually.
                                         if (certificate != null)
                                         {
-                                            
                                         }
 
                                         return true;
@@ -115,7 +110,7 @@ namespace CitadelCore.Net.ConnectionAdapters
                                     );
 
                                 // Spoof a cert for the extracted SNI hostname.
-                                var spoofedCert = m_certStore.GetSpoofedCertificateForHost(sniHost);
+                                var spoofedCert = _certStore.GetSpoofedCertificateForHost(sniHost);
 
                                 try
                                 {
@@ -178,7 +173,7 @@ namespace CitadelCore.Net.ConnectionAdapters
             private readonly SslStream _sslStream;
 
             public HttpsAdaptedConnection(SslStream sslStream)
-            {   
+            {
                 _sslStream = sslStream;
             }
 

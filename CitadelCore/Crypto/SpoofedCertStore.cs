@@ -18,41 +18,40 @@ using Org.BouncyCastle.Utilities;
 using Org.BouncyCastle.X509;
 using Org.BouncyCastle.X509.Extension;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace CitadelCore.Crypto
 {
     /// <summary>
-    /// The SpoofedCertStore class establishes operating system trust. 
+    /// The SpoofedCertStore class establishes operating system trust.
     /// </summary>
     internal class SpoofedCertStore : ISpoofedCertificateStore
     {
         /// <summary>
-        /// Dictionary that keeps all generated, cloned certificates issued by our fake CA. 
+        /// Dictionary that keeps all generated, cloned certificates issued by our fake CA.
         /// </summary>
-        private Dictionary<string, System.Security.Cryptography.X509Certificates.X509Certificate2> m_certificates = new Dictionary<string, System.Security.Cryptography.X509Certificates.X509Certificate2>();
+        private Dictionary<string, System.Security.Cryptography.X509Certificates.X509Certificate2> _certificates = new Dictionary<string, System.Security.Cryptography.X509Certificates.X509Certificate2>();
 
         /// <summary>
-        /// Our CA keypair for signing. 
+        /// Our CA keypair for signing.
         /// </summary>
-        private AsymmetricCipherKeyPair m_caKeypair;
+        private AsymmetricCipherKeyPair _caKeypair;
 
         /// <summary>
-        /// Our CA signer for issuing cloned certificates. 
+        /// Our CA signer for issuing cloned certificates.
         /// </summary>
-        private Asn1SignatureFactory m_caSigner;
+        private Asn1SignatureFactory _caSigner;
 
         /// <summary>
-        /// Our actual CA certificate. 
+        /// Our actual CA certificate.
         /// </summary>
-        private X509Certificate m_caCertificate;
+        private X509Certificate _caCertificate;
 
-        private readonly object m_genLock = new object();
+        private readonly object _genLock = new object();
 
         /// <summary>
-        /// Constructs a new certificate store instance. 
+        /// Constructs a new certificate store instance.
         /// </summary>
         /// <param name="authorityCommonName">
         /// The common name to use when generating the certificate authority. Basically, all SSL
@@ -66,20 +65,19 @@ namespace CitadelCore.Crypto
         }
 
         /// <summary>
-        /// Issues a Domain Validation certificate for the supplied hostname. 
+        /// Issues a Domain Validation certificate for the supplied hostname.
         /// </summary>
         /// <param name="host">
-        /// The hostname for which to issue a DV certificate. 
+        /// The hostname for which to issue a DV certificate.
         /// </param>
         /// <returns>
-        /// A DV certificate for the specified host. 
+        /// A DV certificate for the specified host.
         /// </returns>
         public System.Security.Cryptography.X509Certificates.X509Certificate2 GetSpoofedCertificateForHost(string host)
-        {   
-            lock(m_genLock)
+        {
+            lock (_genLock)
             {
-
-                if (m_certificates.TryGetValue(host, out System.Security.Cryptography.X509Certificates.X509Certificate2 cloned))
+                if (_certificates.TryGetValue(host, out System.Security.Cryptography.X509Certificates.X509Certificate2 cloned))
                 {
                     return cloned;
                 }
@@ -92,7 +90,7 @@ namespace CitadelCore.Crypto
 
                 X509Name dnName = new X509Name(string.Format("CN={0}", host));
                 certGen.SetSerialNumber(serialNumber);
-                certGen.SetIssuerDN(m_caCertificate.SubjectDN);
+                certGen.SetIssuerDN(_caCertificate.SubjectDN);
                 certGen.SetNotBefore(DateTime.Now.AddYears(-1).ToUniversalTime());
                 certGen.SetNotAfter(DateTime.Now.AddYears(2).ToUniversalTime());
                 certGen.SetSubjectDN(dnName);
@@ -101,7 +99,7 @@ namespace CitadelCore.Crypto
                 var certificatePermissions = new List<KeyPurposeID>()
                 {
                      KeyPurposeID.IdKPServerAuth
-                };               
+                };
 
                 certGen.AddExtension(Org.BouncyCastle.Asn1.X509.X509Extensions.ExtendedKeyUsage, false, new ExtendedKeyUsage(certificatePermissions));
                 */
@@ -116,22 +114,22 @@ namespace CitadelCore.Crypto
                 var fkp = kpg.GenerateKeyPair();
 
                 certGen.SetPublicKey(fkp.Public);
-                
-                certGen.AddExtension(X509Extensions.AuthorityKeyIdentifier, false, new AuthorityKeyIdentifierStructure(m_caCertificate));
+
+                certGen.AddExtension(X509Extensions.AuthorityKeyIdentifier, false, new AuthorityKeyIdentifierStructure(_caCertificate));
                 certGen.AddExtension(X509Extensions.SubjectKeyIdentifier, false, new SubjectKeyIdentifierStructure(fkp.Public));
 
-                X509Certificate cert = certGen.Generate(m_caSigner);
+                X509Certificate cert = certGen.Generate(_caSigner);
 
                 var converted = cert.ConvertFromBouncyCastle(fkp);
 
-                m_certificates.Add(host, converted);
+                _certificates.Add(host, converted);
 
                 return converted;
             }
         }
 
         /// <summary>
-        /// Generates a self signed certificate for this store to be able to issue cloned certs. 
+        /// Generates a self signed certificate for this store to be able to issue cloned certs.
         /// </summary>
         /// <param name="authorityCommonName">
         /// The common name to use when generating the certificate authority. Basically, all SSL
@@ -143,9 +141,9 @@ namespace CitadelCore.Crypto
             var kpg = new ECKeyPairGenerator();
             kpg.Init(new KeyGenerationParameters(new SecureRandom(), 256));
 
-            m_caKeypair = kpg.GenerateKeyPair();
+            _caKeypair = kpg.GenerateKeyPair();
 
-            m_caSigner = new Asn1SignatureFactory("SHA256withECDSA", m_caKeypair.Private);
+            _caSigner = new Asn1SignatureFactory("SHA256withECDSA", _caKeypair.Private);
 
             DateTime startDate = DateTime.Now.AddYears(-1).ToUniversalTime();
             DateTime expiryDate = DateTime.Now.AddYears(2).ToUniversalTime();
@@ -159,7 +157,7 @@ namespace CitadelCore.Crypto
                  KeyPurposeID.IdKPCodeSigning,
                  KeyPurposeID.IdKPServerAuth,
                  KeyPurposeID.IdKPTimeStamping,
-                 KeyPurposeID.IdKPOcspSigning,                 
+                 KeyPurposeID.IdKPOcspSigning,
                  KeyPurposeID.IdKPClientAuth
             };
             */
@@ -170,16 +168,16 @@ namespace CitadelCore.Crypto
             certGen.SetNotBefore(startDate);
             certGen.SetNotAfter(expiryDate);
 
-            //certGen.AddExtension(Org.BouncyCastle.Asn1.X509.X509Extensions.ExtendedKeyUsage, false, new ExtendedKeyUsage(certificatePermissions));            
-            certGen.AddExtension(X509Extensions.SubjectKeyIdentifier, false, new SubjectKeyIdentifierStructure(m_caKeypair.Public));
+            //certGen.AddExtension(Org.BouncyCastle.Asn1.X509.X509Extensions.ExtendedKeyUsage, false, new ExtendedKeyUsage(certificatePermissions));
+            certGen.AddExtension(X509Extensions.SubjectKeyIdentifier, false, new SubjectKeyIdentifierStructure(_caKeypair.Public));
             certGen.AddExtension(X509Extensions.KeyUsage, true, new KeyUsage(KeyUsage.CrlSign | KeyUsage.KeyCertSign));
 
             certGen.AddExtension(Org.BouncyCastle.Asn1.X509.X509Extensions.BasicConstraints, false, new BasicConstraints(true));
 
             // Note that because we're self signing, our subject and issuer names are the same.
             certGen.SetSubjectDN(dnName);
-            certGen.SetPublicKey(m_caKeypair.Public);
-            m_caCertificate = certGen.Generate(m_caSigner);
+            certGen.SetPublicKey(_caKeypair.Public);
+            _caCertificate = certGen.Generate(_caSigner);
         }
 
         /// <summary>
@@ -188,14 +186,14 @@ namespace CitadelCore.Crypto
         /// </summary>
         private void EstablishOsTrust()
         {
-            InstallCertificateInHostOsTrustStore(m_caCertificate, true);
+            InstallCertificateInHostOsTrustStore(_caCertificate, true);
         }
 
         /// <summary>
-        /// Attempts to install the given certificate in the host OS's trusted root store. 
+        /// Attempts to install the given certificate in the host OS's trusted root store.
         /// </summary>
         /// <param name="certificate">
-        /// The certificate to install. 
+        /// The certificate to install.
         /// </param>
         /// <param name="overwrite">
         /// Whether or not to overwrite. If true, any and all certificates in the host OS store with
@@ -203,28 +201,28 @@ namespace CitadelCore.Crypto
         /// </param>
         private static void InstallCertificateInHostOsTrustStore(X509Certificate certificate, bool overwrite = false)
         {
-            switch(Environment.OSVersion.Platform)
+            switch (Environment.OSVersion.Platform)
             {
                 case PlatformID.Win32NT:
-                {
-                    var store = new System.Security.Cryptography.X509Certificates.X509Store(System.Security.Cryptography.X509Certificates.StoreName.Root, System.Security.Cryptography.X509Certificates.StoreLocation.LocalMachine);
-                    store.Open(System.Security.Cryptography.X509Certificates.OpenFlags.ReadWrite);
-
-                    if(overwrite)
                     {
-                        UninstallCertificateInHostOsTrustStore(certificate);
+                        var store = new System.Security.Cryptography.X509Certificates.X509Store(System.Security.Cryptography.X509Certificates.StoreName.Root, System.Security.Cryptography.X509Certificates.StoreLocation.LocalMachine);
+                        store.Open(System.Security.Cryptography.X509Certificates.OpenFlags.ReadWrite);
+
+                        if (overwrite)
+                        {
+                            UninstallCertificateInHostOsTrustStore(certificate);
+                        }
+
+                        store.Add(new System.Security.Cryptography.X509Certificates.X509Certificate2(certificate.GetEncoded()));
+
+                        store.Close();
                     }
-
-                    store.Add(new System.Security.Cryptography.X509Certificates.X509Certificate2(certificate.GetEncoded()));
-
-                    store.Close();
-                }
-                break;
+                    break;
 
                 default:
-                {
-                    throw new PlatformNotSupportedException("This operating system is currently unsupported.");
-                }
+                    {
+                        throw new PlatformNotSupportedException("This operating system is currently unsupported.");
+                    }
             }
         }
 
@@ -233,32 +231,32 @@ namespace CitadelCore.Crypto
         /// has the same subject name as the given certificate.
         /// </summary>
         /// <param name="certificate">
-        /// The certificate who's subject name to use for matching certificates that need to be removed. 
+        /// The certificate who's subject name to use for matching certificates that need to be removed.
         /// </param>
         private static void UninstallCertificateInHostOsTrustStore(X509Certificate certificate)
         {
-            switch(Environment.OSVersion.Platform)
+            switch (Environment.OSVersion.Platform)
             {
                 case PlatformID.Win32NT:
-                {
-                    var store = new System.Security.Cryptography.X509Certificates.X509Store(System.Security.Cryptography.X509Certificates.StoreName.Root, System.Security.Cryptography.X509Certificates.StoreLocation.LocalMachine);
-                    store.Open(System.Security.Cryptography.X509Certificates.OpenFlags.ReadWrite);
-
-                    foreach(var storeCert in store.Certificates)
                     {
-                        if(storeCert.SubjectName.Format(false) == certificate.SubjectDN.ToString())
+                        var store = new System.Security.Cryptography.X509Certificates.X509Store(System.Security.Cryptography.X509Certificates.StoreName.Root, System.Security.Cryptography.X509Certificates.StoreLocation.LocalMachine);
+                        store.Open(System.Security.Cryptography.X509Certificates.OpenFlags.ReadWrite);
+
+                        foreach (var storeCert in store.Certificates)
                         {
-                            // Cert with same subject exists. Remove.
-                            store.Remove(storeCert);
+                            if (storeCert.SubjectName.Format(false) == certificate.SubjectDN.ToString())
+                            {
+                                // Cert with same subject exists. Remove.
+                                store.Remove(storeCert);
+                            }
                         }
                     }
-                }
-                break;
+                    break;
 
                 default:
-                {
-                    throw new PlatformNotSupportedException("This operating system is currently unsupported.");
-                }
+                    {
+                        throw new PlatformNotSupportedException("This operating system is currently unsupported.");
+                    }
             }
         }
     }

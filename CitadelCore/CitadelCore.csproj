@@ -6,18 +6,27 @@
     <Company>Technik Empire</Company>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <Copyright>Copyright 2017-2018 (c) Jesse Nicholson. All rights reserved.</Copyright>
+    <Copyright>Copyright 2017-Present (c) Jesse Nicholson. All rights reserved.</Copyright>
     <PackageLicenseUrl>https://www.mozilla.org/en-US/MPL/2.0/</PackageLicenseUrl>
     <PackageProjectUrl>https://github.com/TechnikEmpire/CitadelCore</PackageProjectUrl>
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/TechnikEmpire/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Adds the ability to generate a per-platform spoofed certificate store.</PackageReleaseNotes>
+    <PackageReleaseNotes>Major API overhaul.
+Adds the ability to inspect streams in addition to complete payloads. 
+Adds the ability to fully modify HTTP headers and bodies at-will. 
+Provides copy-less access to payloads for inspection.
+Moves proxy construct arguments into a configuration class for neatness.
+No longer loads all non-ignored payloads into memory.
+Fixes an issue where blocked responses would not actually get blocked.
+Provides a great deal of information about connections now, which makes it possible to match requests and responses to the name of software behind the traffic.
+Misc cleanup of source.</PackageReleaseNotes>
+    <Title>CitadelCore</Title>
     <Summary>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Summary>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>2.3.0</Version>
-    <AssemblyVersion>2.3.0.0</AssemblyVersion>
-    <FileVersion>2.3.0.0</FileVersion>    
+    <Version>3.0.1</Version>
+    <AssemblyVersion>3.0.1.0</AssemblyVersion>
+    <FileVersion>3.0.1.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">
@@ -51,10 +60,11 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics" Version="2.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.ResponseCompression" Version="2.1.1" />
-    <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.1.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.1.2" />
     <PackageReference Include="Microsoft.AspNetCore.WebSockets.Server" Version="0.1.0" />
     <PackageReference Include="Portable.BouncyCastle" Version="1.8.2" />
     <PackageReference Include="StreamExtended" Version="[1.0.81]" />
+    <PackageReference Include="System.Memory" Version="4.5.1" />
     <PackageReference Include="System.Net.WebSockets.Client.Managed" Version="1.0.20" />
   </ItemGroup>
 

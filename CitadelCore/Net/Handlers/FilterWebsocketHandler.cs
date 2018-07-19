@@ -16,6 +16,7 @@ using System.Threading;
 using CitadelCore.Net.Http;
 using CitadelCore.Extensions;
 using System.Collections.Generic;
+using CitadelCore.IO;
 
 namespace CitadelCore.Net.Handlers
 {
@@ -27,11 +28,33 @@ namespace CitadelCore.Net.Handlers
     /// </summary>
     internal class FilterWebsocketHandler : AbstractFilterResponseHandler
     {
-        public FilterWebsocketHandler(MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback) : base(messageBeginCallback, messageEndCallback)
+
+        /// <summary>
+        /// Constructs a FilterWebsocketHandler instance.
+        /// </summary>
+        /// <param name="newMessageCallback">
+        /// Callback used for new messages.
+        /// </param>
+        /// <param name="wholeBodyInspectionCallback">
+        /// Callback used when full-body content inspection is requested on a new message.
+        /// </param>
+        /// <param name="streamInspectionCallback">
+        /// Callback used when streamed content inspection is requested on a new message.
+        /// </param>
+        public FilterWebsocketHandler(NewHttpMessageHandler newMessageCallback, HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback, HttpMessageStreamedInspectionHandler streamInspectionCallback) : base(newMessageCallback, wholeBodyInspectionCallback, streamInspectionCallback)
         {
 
         }
 
+        /// <summary>
+        /// Invoked when this handler is determined to be the best suited to handle the supplied connection.
+        /// </summary>
+        /// <param name="context">
+        /// The HTTP context.
+        /// </param>
+        /// <returns>
+        /// The handling task.
+        /// </returns>
         public override async Task Handle(HttpContext context)
         {
             ClientWebSocket wsServer = null;
@@ -44,11 +67,11 @@ namespace CitadelCore.Net.Handlers
                 var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
 
                 // Need to replate the scheme with appropriate websocket scheme.
-                if(fullUrl.StartsWith("http://"))
+                if(fullUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
                 {
                     fullUrl = "ws://" + fullUrl.Substring(7);
                 }
-                else if(fullUrl.StartsWith("https://"))
+                else if(fullUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                 {
                     fullUrl = "wss://" + fullUrl.Substring(8);
                 }
@@ -107,30 +130,31 @@ namespace CitadelCore.Net.Handlers
 
                 reqHeaderBuilder.Append("\r\n");
 
-                LoggerProxy.Default.Info(string.Format("Connecting websocket to {0}", wsUri.AbsoluteUri));
-
                 // Connect the server websocket to the upstream, remote webserver.
                 await wsServer.ConnectAsync(wsUri, context.RequestAborted);
                 
-                LoggerProxy.Default.Info(String.Format("Connected websocket to {0}", wsUri.AbsoluteUri));
-
                 // Create, via acceptor, the client websocket. This is the local machine's websocket.
                 wsClient = await context.WebSockets.AcceptWebSocketAsync(wsServer.SubProtocol ?? null);
+                
+                var msgNfo = new HttpMessageInfo
+                {
+                    Url = wsUri,
+                    IsEncrypted = context.Request.IsHttps,
+                    Headers = context.Request.Headers.ToNameValueCollection(),
+                    MessageProtocol = MessageProtocol.WebSocket,
+                    MessageType = MessageType.Request,
+                    RemoteAddress = context.Connection.RemoteIpAddress,
+                    RemotePort = (ushort)context.Connection.RemotePort,
+                    LocalAddress = context.Connection.LocalIpAddress,
+                    LocalPort = (ushort)context.Connection.LocalPort
+                };
 
-                ProxyNextAction nxtAction = ProxyNextAction.AllowAndIgnoreContentAndResponse;
-                string customResponseContentType = string.Empty;
-                byte[] customResponse = null;
-                m_msgBeginCb?.Invoke(wsUri, reqHeaderBuilder.ToString(), null, context.Request.IsHttps ? MessageType.SecureWebSocket : MessageType.WebSocket, MessageDirection.Request, out nxtAction, out customResponseContentType, out customResponse);
+                _newMessageCb?.Invoke(msgNfo);
 
-                switch(nxtAction)
+                switch(msgNfo.ProxyNextAction)
                 {
                     case ProxyNextAction.DropConnection:
                         {
-                            if(customResponse != null)
-                            {
-
-                            }
-
                             await wsClient.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);                            
                             return;
                         }

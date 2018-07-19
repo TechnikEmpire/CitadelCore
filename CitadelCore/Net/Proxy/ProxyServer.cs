@@ -33,15 +33,15 @@ namespace CitadelCore.Net.Proxy
         /// List of proxying web servers generated for this host. Currently there's always going to
         /// be two, one for IPV4 and one for IPV6.
         /// </summary>
-        private List<IWebHost> m_hosts = new List<IWebHost>();
+        private List<IWebHost> _hosts = new List<IWebHost>();
 
-        private IDiverter m_diverter;
+        private IDiverter _diverter;
 
         /// <summary>
         /// The TlsSniConnetionAdapter that we use to peek the SNI extension from connected TLS
         /// clients, then spoof a certificate in order to establish a secure connection.
         /// </summary>
-        private readonly TlsSniConnectionAdapter m_tlsConnAdapter;
+        private readonly TlsSniConnectionAdapter _tlsConnAdapter;
 
         /// <summary>
         /// Gets the IPV4 endpoint where HTTP connections are being received. This will be ANY:0
@@ -90,61 +90,49 @@ namespace CitadelCore.Net.Proxy
         {
             get
             {
-                return m_running;
+                return _running;
             }
         }
 
         /// <summary>
         /// Ref held to firewall callback. 
         /// </summary>
-        private FirewallCheckCallback m_fwCallback;
+        private FirewallCheckCallback _fwCallback;
 
         /// <summary>
         /// Flag that indicates if we're running or not. 
         /// </summary>
-        private volatile bool m_running = false;
+        private volatile bool _running = false;
 
         /// <summary>
         /// For synchronizing startup and shutdown. 
         /// </summary>
-        private readonly object m_startStopLock = new object();
+        private readonly object _startStopLock = new object();
 
         /// <summary>
         /// Creates a new proxy server instance. Really there should only ever be a single instance
         /// created at a time.
         /// </summary>
-        /// <param name="authorityCommonName">
-        /// The common name to use when generating the certificate authority. Basically, all SSL
-        /// sites will show that they are secured by a certificate authority with this name that is
-        /// supplied here.
-        /// </param>
-        /// <param name="firewallCallback">
-        /// The firewall check callback. Used to allow the user to determine if a binary should have
-        /// its associated traffic pushed through the filter or not.
-        /// </param>
-        /// <param name="messageBeginCallback">
-        /// Message begin callback enables users to inspect and filter messages immediately after
-        /// they begin. Users also have the power to direct how the proxy will continue to handle the
-        /// overall transaction that this message belongs to.
-        /// </param>
-        /// <param name="messageEndCallback">
-        /// Message end callback enables users to inspect and filter messages once they have completed. 
-        /// </param>
+        /// <param name="configuration">
+        /// The proxy server configuration to use.
+        /// </param>       
         /// <exception cref="ArgumentException">
-        /// Will throw if any one of the callbacks are not defined. 
+        /// Will throw if any one of the callbacks in the supplied configuration are not defined. 
         /// </exception>
-        public ProxyServer(string authorityCommonName, FirewallCheckCallback firewallCallback, MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback)
+        public ProxyServer(ProxyServerConfiguration configuration)
         {
-            m_tlsConnAdapter = new TlsSniConnectionAdapter(CreateCertificateStore(authorityCommonName));
-            m_fwCallback = firewallCallback ?? throw new ArgumentException("The firewall callback MUST be defined.");
-            FilterResponseHandlerFactory.Default.MessageBeginCallback = messageBeginCallback ?? throw new ArgumentException("The message begin callback MUST be defined.");
-            FilterResponseHandlerFactory.Default.MessageEndCallback = messageEndCallback ?? throw new ArgumentException("The message end callback MUST be defined.");
+            _tlsConnAdapter = new TlsSniConnectionAdapter(CreateCertificateStore(configuration.AuthorityName ?? "CitadelCore"));
+            _fwCallback = configuration.FirewallCheckCallback ?? throw new ArgumentException("The firewall callback MUST be defined.", nameof(configuration));
+            FilterResponseHandlerFactory.Default.NewMessageCallback = configuration.NewHttpMessageHandler ?? throw new ArgumentException("The new message callback MUST be defined.", nameof(configuration));
+            FilterResponseHandlerFactory.Default.WholeBodyInspectionCallback = configuration.HttpMessageWholeBodyInspectionHandler ?? throw new ArgumentException("The whole-body content inspection callback MUST be defined.", nameof(configuration));
+            FilterResponseHandlerFactory.Default.StreamedInspectionCallback = configuration.HttpMessageStreamedInspectionHandler ?? throw new ArgumentException("The streaming content inspection callback MUST be defined.", nameof(configuration));
 
             // Hook the cert verification callback.
             ServicePointManager.ServerCertificateValidationCallback += CertificateVerificationHandler;
         }
 
         /// <summary>
+        /// Creates a new SpoofedCertStore to be used with the proxy for secure connections.
         /// </summary>
         /// <param name="authorityCommonName">
         /// The common name to use when generating the certificate authority. Basically, all SSL
@@ -167,34 +155,34 @@ namespace CitadelCore.Net.Proxy
         /// </exception>
         public void Start()
         {
-            lock (m_startStopLock)
+            lock (_startStopLock)
             {
-                if (m_running)
+                if (_running)
                 {
                     return;
                 }
 
-                m_hosts = new List<IWebHost>()
+                _hosts = new List<IWebHost>()
                 {
                     CreateHost(false),
                     CreateHost(true)
                 };
 
-                m_diverter = CreateDiverter(
+                _diverter = CreateDiverter(
                         V4HttpEndpoint,
                         V4HttpsEndpoint,
                         V6HttpEndpoint,
                         V6HttpsEndpoint
                     );
 
-                m_diverter.ConfirmDenyFirewallAccess = (procPath) =>
+                _diverter.ConfirmDenyFirewallAccess = (procPath) =>
                 {
-                    return m_fwCallback.Invoke(procPath);
+                    return _fwCallback.Invoke(procPath);
                 };
 
-                m_diverter.Start(0);
+                _diverter.Start(0);
 
-                m_running = true;
+                _running = true;
             }
         }
 
@@ -223,23 +211,23 @@ namespace CitadelCore.Net.Proxy
         /// </summary>
         public void Stop()
         {
-            lock (m_startStopLock)
+            lock (_startStopLock)
             {
-                if (!m_running)
+                if (!_running)
                 {
                     return;
                 }
 
-                foreach (var host in m_hosts)
+                foreach (var host in _hosts)
                 {
                     host.StopAsync().Wait();
                 }
 
-                m_hosts = new List<IWebHost>();
+                _hosts = new List<IWebHost>();
 
-                m_diverter.Stop();
+                _diverter.Stop();
 
-                m_running = false;
+                _running = false;
             }
         }
 
@@ -347,7 +335,7 @@ namespace CitadelCore.Net.Proxy
                 {
                     // Plug in our TLS connection adapter. This adapter will handle SNI parsing and
                     // certificate spoofing based on the SNI value.
-                    listenOpts.ConnectionAdapters.Add(m_tlsConnAdapter);
+                    listenOpts.ConnectionAdapters.Add(_tlsConnAdapter);
 
                     // Who doesn't love to kick that old Nagle to the curb?
                     listenOpts.NoDelay = true;
