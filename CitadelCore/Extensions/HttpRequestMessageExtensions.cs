@@ -99,10 +99,12 @@ namespace CitadelCore.Extensions
 
                         failedHeaders = message.PopulateHeaders(messageInfo.Headers);
 
+#if VERBOSE_WARNINGS
                         foreach (string key in failedHeaders)
                         {
                             LoggerProxy.Default.Warn(string.Format("Failed to add HTTP header with key {0} and with value {1}.", key, failedHeaders[key]));
                         }
+#endif
 
                         message.Content.Headers.TryAddWithoutValidation("Expires", TimeUtil.UnixEpochString);
 
@@ -110,6 +112,10 @@ namespace CitadelCore.Extensions
                         {
                             message.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(messageInfo.BodyContentType);
                         }
+                    }
+                    else if (messageInfo.BodyIsUserCreated && messageInfo.Body.Length <= 0)
+                    {
+                        message.Content = null;
                     }
 
                     return true;

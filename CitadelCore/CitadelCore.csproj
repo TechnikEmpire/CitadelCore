@@ -12,21 +12,15 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/TechnikEmpire/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Major API overhaul.
-Adds the ability to inspect streams in addition to complete payloads. 
-Adds the ability to fully modify HTTP headers and bodies at-will. 
-Provides copy-less access to payloads for inspection.
-Moves proxy construct arguments into a configuration class for neatness.
-No longer loads all non-ignored payloads into memory.
-Fixes an issue where blocked responses would not actually get blocked.
-Provides a great deal of information about connections now, which makes it possible to match requests and responses to the name of software behind the traffic.
-Misc cleanup of source.</PackageReleaseNotes>
+    <PackageReleaseNotes>Fixes a critical issue introducts in 3.0.1 where a failure to modify the payload causes responses to become malformed.
+No longer logs exceptions when inspection streams are force-closed.
+No longer nags the user with silly warnings about header issues that are really a non-issue.</PackageReleaseNotes>
     <Title>CitadelCore</Title>
     <Summary>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Summary>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>3.0.1</Version>
-    <AssemblyVersion>3.0.1.0</AssemblyVersion>
-    <FileVersion>3.0.1.0</FileVersion>    
+    <Version>3.0.4</Version>
+    <AssemblyVersion>3.0.4.0</AssemblyVersion>
+    <FileVersion>3.0.4.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">

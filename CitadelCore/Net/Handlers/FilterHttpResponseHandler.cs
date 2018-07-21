@@ -286,10 +286,12 @@ namespace CitadelCore.Net.Handlers
                 // so once we have a .Content property created, we'll go ahead and
                 // pour over the failed headers and try to apply to them to the content.
                 initialFailedHeaders = requestMsg.PopulateHeaders(initialFailedHeaders);
+#if VERBOSE_WARNINGS
                 foreach (string key in initialFailedHeaders)
                 {
                     LoggerProxy.Default.Warn(string.Format("Failed to add HTTP header with key {0} and with value {1}.", key, initialFailedHeaders[key]));
                 }
+#endif
 
                 // Lets start sending the request upstream. We're going to ask the client to return
                 // control to us when the headers are complete. This way we're not buffering entire
@@ -492,6 +494,9 @@ namespace CitadelCore.Net.Handlers
                 // without any inspection etc, so do exactly that.
                 using (var responseStream = await response.Content.ReadAsStreamAsync())
                 {
+                    context.Response.StatusCode = (int)response.StatusCode;
+                    context.Response.PopulateHeaders(response.ExportAllHeaders());
+
                     if (!responseHasZeroContentLength && (upstreamIsHttp1 || responseIsFixedLength))
                     {
                         using (var ms = new MemoryStream())
@@ -500,6 +505,8 @@ namespace CitadelCore.Net.Handlers
 
                             var responseBody = ms.ToArray();
 
+                            context.Response.Headers.Remove("Content-Length");
+
                             context.Response.Headers.Add("Content-Length", responseBody.Length.ToString());
 
                             await context.Response.Body.WriteAsync(responseBody, 0, responseBody.Length);
@@ -507,6 +514,8 @@ namespace CitadelCore.Net.Handlers
                     }
                     else
                     {
+                        context.Response.Headers.Remove("Content-Length");
+
                         if (responseHasZeroContentLength)
                         {
                             context.Response.Headers.Add("Content-Length", "0");

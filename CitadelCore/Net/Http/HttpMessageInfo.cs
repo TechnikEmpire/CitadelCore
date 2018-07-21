@@ -276,7 +276,7 @@ namespace CitadelCore.Net.Http
                 Array.Clear(_body, 0, _body.Length);
             }
 
-            BodyInternal = new Memory<byte>();
+            Body = new Memory<byte>();
 
             Headers["Expires"] = TimeUtil.UnixEpochString;
             Headers["Location"] = location;
@@ -297,7 +297,7 @@ namespace CitadelCore.Net.Http
                 Array.Clear(_body, 0, _body.Length);
             }
 
-            BodyInternal = new Memory<byte>();
+            Body = new Memory<byte>();
 
             Headers["Expires"] = TimeUtil.UnixEpochString;
         }

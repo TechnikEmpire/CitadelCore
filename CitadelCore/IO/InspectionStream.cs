@@ -32,30 +32,61 @@ namespace CitadelCore.IO
         /// <summary>
         /// Indicates whether the stream supports reading.
         /// </summary>
-        public override bool CanRead => _innerStream.CanRead;
+        public override bool CanRead
+        {
+            get
+            {
+                return _innerStream.CanRead;
+            }
+        }
 
         /// <summary>
         /// Indicates whether the stream supports seeking.
         /// </summary>
-        public override bool CanSeek => _innerStream.CanSeek;
+        public override bool CanSeek
+        {
+            get
+            {
+                return _innerStream.CanSeek;
+            }
+        }
 
         /// <summary>
         /// Indicates whether the stream supports writing.
         /// </summary>
-        public override bool CanWrite => _innerStream.CanWrite;
+        public override bool CanWrite
+        {
+            get
+            {
+                return _innerStream.CanWrite;
+            }
+        }
 
         /// <summary>
         /// Gets the length of the stream in bytes.
         /// </summary>
-        public override long Length => _innerStream.Length;
+        public override long Length
+        {
+            get
+            {
+                return _innerStream.Length;
+            }
+        }
 
         /// <summary>
         /// Gets or sets the position in the stream.
         /// </summary>
         public override long Position
         {
-            get => _innerStream.Position;
-            set => _innerStream.Position = value;
+            get
+            {
+                return _innerStream.Position;
+            }
+
+            set
+            {
+                _innerStream.Position = value;
+            }
         }
 
         /// <summary>
@@ -241,8 +272,20 @@ namespace CitadelCore.IO
                 // This is pretty cold-blooded but it's about the only option we have from inside
                 // here. We have error handling that will prevent any exceptions this raises from
                 // crashing the program though so there ya go.
-                _innerStream.Dispose();
-                _innerStream = null;
+                try
+                {
+                    _innerStream.Close();
+                }
+                catch { }
+
+
+                try
+                {
+                    _innerStream.Dispose();
+                }
+                catch { }
+
+                _innerStream = new ClosedStream();
             }
         }
 
@@ -264,6 +307,7 @@ namespace CitadelCore.IO
                 if (_innerStream != null)
                 {
                     _innerStream.Dispose();
+                    _innerStream = null;
                 }
 
                 _disposed = true;

@@ -7,6 +7,7 @@
 
 using CitadelCore.Crypto;
 using CitadelCore.Extensions;
+using CitadelCore.IO;
 using CitadelCore.Logging;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Adapter.Internal;
@@ -18,7 +19,6 @@ using System.Linq;
 using System.Net.Security;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace CitadelCore.Net.ConnectionAdapters
@@ -191,64 +191,6 @@ namespace CitadelCore.Net.ConnectionAdapters
 
             public void Dispose()
             {
-            }
-        }
-
-        internal class ClosedStream : Stream
-        {
-            private static readonly Task<int> ZeroResultTask = Task.FromResult(result: 0);
-
-            public override bool CanRead => true;
-            public override bool CanSeek => false;
-            public override bool CanWrite => false;
-
-            public override long Length
-            {
-                get
-                {
-                    throw new NotSupportedException();
-                }
-            }
-
-            public override long Position
-            {
-                get
-                {
-                    throw new NotSupportedException();
-                }
-                set
-                {
-                    throw new NotSupportedException();
-                }
-            }
-
-            public override void Flush()
-            {
-            }
-
-            public override long Seek(long offset, SeekOrigin origin)
-            {
-                throw new NotSupportedException();
-            }
-
-            public override void SetLength(long value)
-            {
-                throw new NotSupportedException();
-            }
-
-            public override int Read(byte[] buffer, int offset, int count)
-            {
-                return 0;
-            }
-
-            public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-            {
-                return ZeroResultTask;
-            }
-
-            public override void Write(byte[] buffer, int offset, int count)
-            {
-                throw new NotSupportedException();
             }
         }
     }
