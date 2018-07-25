@@ -23,8 +23,6 @@ namespace CitadelCore.Extensions
     /// </summary>
     internal static class HttpResponseExtensions
     {
-        private static readonly char[] s_splitChars = new[] { ',' };
-
         /// <summary>
         /// Copies all possible headers from the given collection into this HttpResponse instance and
         /// then returns the headers that failed to be added.
@@ -51,8 +49,8 @@ namespace CitadelCore.Extensions
                 }
 
                 try
-                {
-                    message.Headers.Add(key, new Microsoft.Extensions.Primitives.StringValues(headers[key].Split(s_splitChars, StringSplitOptions.RemoveEmptyEntries)));
+                {   
+                    message.Headers.Add(key, new Microsoft.Extensions.Primitives.StringValues(headers.GetValues(key)));
                     clonedCollection.Remove(key);
                 }
                 catch { }

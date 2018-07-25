@@ -12,15 +12,13 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/TechnikEmpire/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Fixes a critical issue introducts in 3.0.1 where a failure to modify the payload causes responses to become malformed.
-No longer logs exceptions when inspection streams are force-closed.
-No longer nags the user with silly warnings about header issues that are really a non-issue.</PackageReleaseNotes>
+    <PackageReleaseNotes>Fixes header transport issue introduced in 3.0.x</PackageReleaseNotes>
     <Title>CitadelCore</Title>
     <Summary>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Summary>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
     <Version>3.0.4</Version>
-    <AssemblyVersion>3.0.4.0</AssemblyVersion>
-    <FileVersion>3.0.4.0</FileVersion>    
+    <AssemblyVersion>3.0.5.0</AssemblyVersion>
+    <FileVersion>3.0.5.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">

@@ -27,12 +27,15 @@ namespace CitadelCore.Extensions
         public static NameValueCollection ToNameValueCollection(this IHeaderDictionary dict)
         {
             var collection = new NameValueCollection();
-
+            
             foreach (var kvp in dict)
             {
                 foreach (var sv in kvp.Value)
-                {   
-                    collection.Add(kvp.Key, kvp.Value);
+                {
+                    foreach (var value in kvp.Value)
+                    {
+                        collection.Add(kvp.Key, value);
+                    }
                 }
             }
 

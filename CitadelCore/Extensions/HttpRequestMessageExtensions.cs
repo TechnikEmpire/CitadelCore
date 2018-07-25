@@ -20,8 +20,6 @@ namespace CitadelCore.Extensions
 {
     internal static class HttpRequestMessageExtensions
     {
-        private static readonly char[] s_splitChars = new[] { ',' };
-
         /// <summary>
         /// Copies all possible headers from the given collection into this HttpRequestMessage
         /// instance and then returns the headers that failed to be added.
@@ -47,7 +45,7 @@ namespace CitadelCore.Extensions
                     continue;
                 }
 
-                if (message.Headers.TryAddWithoutValidation(key, headers[key].Split(s_splitChars, StringSplitOptions.RemoveEmptyEntries)))
+                if (message.Headers.TryAddWithoutValidation(key, headers.GetValues(key)))
                 {
                     clonedCollection.Remove(key);
                 }
@@ -55,7 +53,7 @@ namespace CitadelCore.Extensions
                 {
                     if (message.Content != null)
                     {
-                        if (message.Content.Headers.TryAddWithoutValidation(key, headers[key].Split(s_splitChars, StringSplitOptions.RemoveEmptyEntries)))
+                        if (message.Content.Headers.TryAddWithoutValidation(key, headers.GetValues(key)))
                         {
                             clonedCollection.Remove(key);
                         }

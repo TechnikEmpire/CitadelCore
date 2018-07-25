@@ -159,7 +159,6 @@ namespace CitadelCore.Net.Handlers
                 {
                     // Apply whatever the user did here and then quit.
                     await context.Response.ApplyMessageInfo(requestMessageNfo, context.RequestAborted);
-
                     return;
                 }
 

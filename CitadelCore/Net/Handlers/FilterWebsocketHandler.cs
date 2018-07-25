@@ -118,11 +118,9 @@ namespace CitadelCore.Net.Handlers
                         try
                         {
                             wsServer.Options.SetRequestHeader(hdr.Key, hdr.Value.ToString());
-                            Console.WriteLine("Set Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
                         }
                         catch(Exception hdrException)
                         {
-                            Console.WriteLine("Failed Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
                             LoggerProxy.Default.Error(hdrException);
                         }
                     }
@@ -247,19 +245,6 @@ namespace CitadelCore.Net.Handlers
             }
             catch(Exception wshe)
             {
-                if(wshe is System.Net.WebSockets.WebSocketException)
-                {
-                    var cast = wshe as System.Net.WebSockets.WebSocketException;
-
-                    Console.WriteLine(cast.WebSocketErrorCode);
-                    if(cast.Data != null)
-                    {
-                        foreach(KeyValuePair<object, object> kvp in cast.Data)
-                        {
-                            Console.WriteLine("{0} ::: {1}", kvp.Key, kvp.Value);
-                        }
-                    }
-                }
                 LoggerProxy.Default.Error(wshe);
             }
             finally
