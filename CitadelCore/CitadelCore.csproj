@@ -16,7 +16,7 @@
     <Title>CitadelCore</Title>
     <Summary>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Summary>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>3.0.4</Version>
+    <Version>3.0.5</Version>
     <AssemblyVersion>3.0.5.0</AssemblyVersion>
     <FileVersion>3.0.5.0</FileVersion>    
   </PropertyGroup>
