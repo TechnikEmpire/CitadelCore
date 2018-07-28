@@ -84,7 +84,7 @@ namespace CitadelCore.Net.Proxy
         /// <param name="processId">
         /// The process ID of the application in question.
         /// </param>
-        internal FirewallRequest(string binaryAbsolutePath, ushort localPort, ushort remotePort, ulong processId)
+        public FirewallRequest(string binaryAbsolutePath, ushort localPort, ushort remotePort, ulong processId)
         {
             BinaryAbsolutePath = binaryAbsolutePath;
             LocalPort = localPort;
