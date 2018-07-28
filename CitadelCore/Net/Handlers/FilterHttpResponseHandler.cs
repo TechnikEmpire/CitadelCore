@@ -151,16 +151,17 @@ namespace CitadelCore.Net.Handlers
 
                 _newMessageCb?.Invoke(requestMessageNfo);
 
-                // Create the message AFTER we give the user a chance to alter things.
-                requestMsg = new HttpRequestMessage(requestMessageNfo.Method, requestMessageNfo.Url);
-                var initialFailedHeaders = requestMsg.PopulateHeaders(requestMessageNfo.Headers);
-
                 if (requestMessageNfo.ProxyNextAction == ProxyNextAction.DropConnection)
                 {
                     // Apply whatever the user did here and then quit.
+                    context.Response.ClearAllHeaders();
                     await context.Response.ApplyMessageInfo(requestMessageNfo, context.RequestAborted);
                     return;
                 }
+
+                // Create the message AFTER we give the user a chance to alter things.
+                requestMsg = new HttpRequestMessage(requestMessageNfo.Method, requestMessageNfo.Url);
+                var initialFailedHeaders = requestMsg.PopulateHeaders(requestMessageNfo.Headers);
 
                 // Check if we have a request body.
                 if (context.Request.Body != null)
@@ -201,20 +202,21 @@ namespace CitadelCore.Net.Handlers
 
                                         _wholeBodyInspectionCb?.Invoke(requestMessageNfo);
 
+                                        if (requestMessageNfo.ProxyNextAction == ProxyNextAction.DropConnection)
+                                        {
+                                            // User wants to block this request after inspecting the content.
+                                            // Apply whatever the user did here and then quit.
+                                            context.Response.ClearAllHeaders();
+                                            await context.Response.ApplyMessageInfo(requestMessageNfo, context.RequestAborted);
+
+                                            return;
+                                        }
+
                                         // Since the user may have modified things, we'll now re-create
                                         // the request no matter what.
                                         requestMsg = new HttpRequestMessage(requestMessageNfo.Method, requestMessageNfo.Url);
                                         initialFailedHeaders = requestMsg.PopulateHeaders(requestMessageNfo.Headers);
 
-                                        if (requestMessageNfo.ProxyNextAction == ProxyNextAction.DropConnection)
-                                        {
-                                            // User wants to block this request after inspecting the content.
-                                            // Apply whatever the user did here and then quit.
-                                            await context.Response.ApplyMessageInfo(requestMessageNfo, context.RequestAborted);
-
-                                            return;
-                                        }
-                                        
                                         // Set our content, even if it's empty. Don't worry about ByteArrayContent
                                         // and friends setting other headers, we're gonna blow relevant headers away
                                         // below and then set them properly.
@@ -314,7 +316,7 @@ namespace CitadelCore.Net.Handlers
                 }
 
                 // Blow away all response headers. We wanna clone these now from our upstream request.
-                context.Response.Headers.Clear();
+                context.Response.ClearAllHeaders();
 
                 // Ensure our client's response status code is set to match ours.
                 context.Response.StatusCode = (int)response.StatusCode;
@@ -372,16 +374,17 @@ namespace CitadelCore.Net.Handlers
 
                     _newMessageCb?.Invoke(responseMessageNfo);
 
-                    context.Response.ClearAllHeaders();
-                    context.Response.PopulateHeaders(responseMessageNfo.Headers);
-
                     if (responseMessageNfo.ProxyNextAction == ProxyNextAction.DropConnection)
                     {
                         // Apply whatever the user did here and then quit.
-                        await context.Response.ApplyMessageInfo(requestMessageNfo, context.RequestAborted);
+                        context.Response.ClearAllHeaders();
+                        await context.Response.ApplyMessageInfo(responseMessageNfo, context.RequestAborted);
 
                         return;
                     }
+
+                    context.Response.ClearAllHeaders();
+                    context.Response.PopulateHeaders(responseMessageNfo.Headers);
 
                     switch (responseMessageNfo.ProxyNextAction)
                     {
@@ -411,16 +414,17 @@ namespace CitadelCore.Net.Handlers
 
                                         _wholeBodyInspectionCb?.Invoke(responseMessageNfo);
 
-                                        context.Response.ClearAllHeaders();
-                                        context.Response.PopulateHeaders(responseMessageNfo.Headers);
-
                                         if (responseMessageNfo.ProxyNextAction == ProxyNextAction.DropConnection)
                                         {
                                             // Apply whatever the user did here and then quit.
-                                            await context.Response.ApplyMessageInfo(requestMessageNfo, context.RequestAborted);
+                                            context.Response.ClearAllHeaders();
+                                            await context.Response.ApplyMessageInfo(responseMessageNfo, context.RequestAborted);
 
                                             return;
                                         }
+
+                                        context.Response.ClearAllHeaders();
+                                        context.Response.PopulateHeaders(responseMessageNfo.Headers);
 
                                         // User inspected but allowed the content. Just write to the response
                                         // body and then move on with your life fam.

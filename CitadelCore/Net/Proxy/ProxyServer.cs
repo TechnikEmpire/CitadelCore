@@ -147,13 +147,19 @@ namespace CitadelCore.Net.Proxy
         }
 
         /// <summary>
-        /// Starts the proxy server on both IPV4 and IPV6 address space. 
+        /// Starts the proxy server on both IPV4 and IPV6 address space.
         /// </summary>
+        /// <param name="numThreads">
+        /// An optional value that can be used to set the number of threads that the underlying
+        /// packet diversion system will use for packet IO. Defaults to zero. If less than or equal
+        /// to zero, the diverter should automatically choose to use one thread per logical core.
+        /// However, given that diverters are platform specific, this is not guaranteed.
+        /// </param>
         /// <exception cref="NullReferenceException">
         /// In the event that the internal kestrel engine doesn't properly initialize, this method
         /// will throw.
         /// </exception>
-        public void Start()
+        public void Start(int numThreads = 0)
         {
             lock (_startStopLock)
             {
@@ -180,7 +186,7 @@ namespace CitadelCore.Net.Proxy
                     return _fwCallback.Invoke(procPath);
                 };
 
-                _diverter.Start(0);
+                _diverter.Start(numThreads);
 
                 _running = true;
             }

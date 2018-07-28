@@ -12,13 +12,15 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/TechnikEmpire/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Fixes header transport issue introduced in 3.0.x</PackageReleaseNotes>
+    <PackageReleaseNotes>Fixes an issue where duplicate headers were being generated.
+Fixes an issue where user generated header values could be ignored.
+Adds an interface to the Start mechanism of the ProxyServer class where the user can specify the total number of packet IO threads. Defaults to 0, which is auto-select for the platform specific diverter that is actually using this value.</PackageReleaseNotes>
     <Title>CitadelCore</Title>
     <Summary>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Summary>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>3.0.5</Version>
-    <AssemblyVersion>3.0.5.0</AssemblyVersion>
-    <FileVersion>3.0.5.0</FileVersion>    
+    <Version>3.0.8</Version>
+    <AssemblyVersion>3.0.8.0</AssemblyVersion>
+    <FileVersion>3.0.8.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">
@@ -41,6 +43,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <DocumentationFile>bin\Debug\netstandard2.0\CitadelCore.xml</DocumentationFile>
+    <DefineConstants>TRACE;DEBUG;VERBOSE_WARNINGS</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
