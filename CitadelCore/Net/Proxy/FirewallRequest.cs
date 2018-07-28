@@ -46,6 +46,15 @@ namespace CitadelCore.Net.Proxy
         }
 
         /// <summary>
+        /// The process ID of the application in question.
+        /// </summary>
+        public ulong ProcessId
+        {
+            get;
+            private set;
+        }
+
+        /// <summary>
         /// Gets whether or not the process associated with the flow is a system process.
         /// </summary>
         /// <remarks>
@@ -72,11 +81,15 @@ namespace CitadelCore.Net.Proxy
         /// <param name="remotePort">
         /// The remote port associated with the flow.
         /// </param>
-        public FirewallRequest(string binaryAbsolutePath, ushort localPort, ushort remotePort)
+        /// <param name="processId">
+        /// The process ID of the application in question.
+        /// </param>
+        internal FirewallRequest(string binaryAbsolutePath, ushort localPort, ushort remotePort, ulong processId)
         {
             BinaryAbsolutePath = binaryAbsolutePath;
             LocalPort = localPort;
             RemotePort = remotePort;
+            ProcessId = processId;
         }
     }
 }
