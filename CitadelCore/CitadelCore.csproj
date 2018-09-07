@@ -12,13 +12,13 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/TechnikEmpire/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Adds the protocol version to the message info object.</PackageReleaseNotes>
+    <PackageReleaseNotes>Makes MessageType for the message info object writeable by users. This was mistakenly set to internal previously.</PackageReleaseNotes>
     <Title>CitadelCore</Title>
     <Summary>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Summary>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>3.0.13</Version>
-    <AssemblyVersion>3.0.13.0</AssemblyVersion>
-    <FileVersion>3.0.13.0</FileVersion>    
+    <Version>3.0.14</Version>
+    <AssemblyVersion>3.0.14.0</AssemblyVersion>
+    <FileVersion>3.0.14.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">

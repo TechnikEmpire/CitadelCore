@@ -179,7 +179,7 @@ namespace CitadelCore.Net.Http
         public MessageType MessageType
         {
             get;
-            internal set;
+            set;
         } = MessageType.Request;
 
         /// <summary>
