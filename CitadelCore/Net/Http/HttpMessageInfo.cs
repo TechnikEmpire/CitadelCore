@@ -59,6 +59,22 @@ namespace CitadelCore.Net.Http
         } = HttpStatusCode.OK;
 
         /// <summary>
+        /// Gets the HTTP version used for this message.
+        /// </summary>
+        /// <remarks>
+        /// This is provided as a read-only object because users cannot randomly change the protocol
+        /// in the middle of a transaction. This information is provided because it is the
+        /// responsibility of the user, when modifying data, to make sure that headers, as well as
+        /// all other properties, are set correctly. This will aid library users in setting
+        /// protocol-specific headers, for example.
+        /// </remarks>
+        public Version HttpVersion
+        {
+            get;
+            internal set;
+        } = new Version(1, 0);
+
+        /// <summary>
         /// Gets the message headers.
         /// </summary>
         public NameValueCollection Headers

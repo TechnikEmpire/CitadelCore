@@ -134,6 +134,16 @@ namespace CitadelCore.Net.Handlers
                 
                 HttpRequestMessage requestMsg;
 
+                // Match the HTTP version of the client on the upstream request. We don't want to
+                // transparently pass around headers that are wrong for the client's HTTP version.
+                Version upstreamReqVersionMatch = null;
+
+                Match match = s_httpVerRegex.Match(context.Request.Protocol);
+                if (match != null && match.Success)
+                {
+                    upstreamReqVersionMatch = Version.Parse(match.Value);
+                }
+
                 // Let's do our first call to message begin for the request side.                
                 var requestMessageNfo = new HttpMessageInfo
                 {
@@ -141,6 +151,7 @@ namespace CitadelCore.Net.Handlers
                     Method = new HttpMethod(context.Request.Method),
                     IsEncrypted = context.Request.IsHttps,
                     Headers = context.Request.Headers.ToNameValueCollection(),
+                    HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
                     MessageProtocol = MessageProtocol.Http,
                     MessageType = MessageType.Request,
                     RemoteAddress = context.Connection.RemoteIpAddress,
@@ -162,6 +173,12 @@ namespace CitadelCore.Net.Handlers
                 // Create the message AFTER we give the user a chance to alter things.
                 requestMsg = new HttpRequestMessage(requestMessageNfo.Method, requestMessageNfo.Url);                
                 var initialFailedHeaders = requestMsg.PopulateHeaders(requestMessageNfo.Headers);
+
+                // Ensure that we match the protocol of the client!
+                if (upstreamReqVersionMatch != null)
+                {
+                    requestMsg.Version = upstreamReqVersionMatch;
+                }
 
                 // Check if we have a request body.
                 if (context.Request.Body != null)
@@ -191,6 +208,7 @@ namespace CitadelCore.Net.Handlers
                                             Method = new HttpMethod(context.Request.Method),
                                             IsEncrypted = context.Request.IsHttps,
                                             Headers = context.Request.Headers.ToNameValueCollection(),
+                                            HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
                                             MessageProtocol = MessageProtocol.Http,
                                             MessageType = MessageType.Request,
                                             RemoteAddress = context.Connection.RemoteIpAddress,
@@ -246,6 +264,7 @@ namespace CitadelCore.Net.Handlers
                                     Method = new HttpMethod(context.Request.Method),
                                     IsEncrypted = context.Request.IsHttps,
                                     Headers = context.Request.Headers.ToNameValueCollection(),
+                                    HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
                                     MessageProtocol = MessageProtocol.Http,
                                     MessageType = MessageType.Request,
                                     RemoteAddress = context.Connection.RemoteIpAddress,
@@ -341,17 +360,6 @@ namespace CitadelCore.Net.Handlers
                         }
                     }
                 }
-                
-                // Match the HTTP version of the client on the upstream request. We don't want to
-                // transparently pass around headers that are wrong for the client's HTTP version.
-                Version upstreamReqVersionMatch = null;
-
-                Match match = s_httpVerRegex.Match(context.Request.Protocol);
-                if (match != null && match.Success)
-                {
-                    upstreamReqVersionMatch = Version.Parse(match.Value);
-                    requestMsg.Version = upstreamReqVersionMatch;
-                }
 
                 // For later reference...
                 bool upstreamIsHttp1 = upstreamReqVersionMatch != null && upstreamReqVersionMatch.Major == 1 && upstreamReqVersionMatch.Minor == 0;
@@ -365,6 +373,7 @@ namespace CitadelCore.Net.Handlers
                         IsEncrypted = context.Request.IsHttps,
                         Headers = response.ExportAllHeaders(),
                         MessageProtocol = MessageProtocol.Http,
+                        HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
                         StatusCode = response.StatusCode,
                         MessageType = MessageType.Response,
                         RemoteAddress = context.Connection.RemoteIpAddress,
@@ -405,6 +414,7 @@ namespace CitadelCore.Net.Handlers
                                             IsEncrypted = context.Request.IsHttps,
                                             Headers = response.ExportAllHeaders(),
                                             MessageProtocol = MessageProtocol.Http,
+                                            HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
                                             StatusCode = response.StatusCode,
                                             MessageType = MessageType.Response,
                                             RemoteAddress = context.Connection.RemoteIpAddress,
@@ -470,6 +480,7 @@ namespace CitadelCore.Net.Handlers
                                     Headers = response.ExportAllHeaders(),
                                     MessageProtocol = MessageProtocol.Http,
                                     StatusCode = response.StatusCode,
+                                    HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
                                     MessageType = MessageType.Response,
                                     RemoteAddress = context.Connection.RemoteIpAddress,
                                     RemotePort = (ushort)context.Connection.RemotePort,
