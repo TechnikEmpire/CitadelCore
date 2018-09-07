@@ -19,6 +19,13 @@ namespace CitadelCore.Net.Http
     /// The HttpMessageInfo class communicates intent and data about a connection between the
     /// filtering library and library users.
     /// </summary>
+    /// <remarks>
+    /// When using this class, the process of ensuring that all properties are correct is a burden
+    /// passed on to the user. For example, when setting a user-defined payload, the user MUST set
+    /// <seealso cref="MessageType" /> to <seealso cref="MessageType.Response" /> for that payload to
+    /// be properly written to the stream in question. Any headers must be checked and set properly
+    /// by the user, status code, so on and so forth.
+    /// </remarks>
     public class HttpMessageInfo
     {
         /// <summary>
@@ -149,6 +156,10 @@ namespace CitadelCore.Net.Http
         /// <summary>
         /// Gets the message type.
         /// </summary>
+        /// <remarks>
+        /// The burden of ensuring that this propertyis set correctly, as well as all other
+        /// properties, is on the user alone.
+        /// </remarks>
         public MessageType MessageType
         {
             get;

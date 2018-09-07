@@ -131,7 +131,7 @@ namespace CitadelCore.Net.Handlers
                     }
                     catch { }
                 }
-
+                
                 HttpRequestMessage requestMsg;
 
                 // Let's do our first call to message begin for the request side.                
@@ -160,7 +160,7 @@ namespace CitadelCore.Net.Handlers
                 }
 
                 // Create the message AFTER we give the user a chance to alter things.
-                requestMsg = new HttpRequestMessage(requestMessageNfo.Method, requestMessageNfo.Url);
+                requestMsg = new HttpRequestMessage(requestMessageNfo.Method, requestMessageNfo.Url);                
                 var initialFailedHeaders = requestMsg.PopulateHeaders(requestMessageNfo.Headers);
 
                 // Check if we have a request body.
@@ -341,7 +341,7 @@ namespace CitadelCore.Net.Handlers
                         }
                     }
                 }
-
+                
                 // Match the HTTP version of the client on the upstream request. We don't want to
                 // transparently pass around headers that are wrong for the client's HTTP version.
                 Version upstreamReqVersionMatch = null;
@@ -365,6 +365,7 @@ namespace CitadelCore.Net.Handlers
                         IsEncrypted = context.Request.IsHttps,
                         Headers = response.ExportAllHeaders(),
                         MessageProtocol = MessageProtocol.Http,
+                        StatusCode = response.StatusCode,
                         MessageType = MessageType.Response,
                         RemoteAddress = context.Connection.RemoteIpAddress,
                         RemotePort = (ushort)context.Connection.RemotePort,
@@ -404,6 +405,7 @@ namespace CitadelCore.Net.Handlers
                                             IsEncrypted = context.Request.IsHttps,
                                             Headers = response.ExportAllHeaders(),
                                             MessageProtocol = MessageProtocol.Http,
+                                            StatusCode = response.StatusCode,
                                             MessageType = MessageType.Response,
                                             RemoteAddress = context.Connection.RemoteIpAddress,
                                             RemotePort = (ushort)context.Connection.RemotePort,
@@ -467,6 +469,7 @@ namespace CitadelCore.Net.Handlers
                                     IsEncrypted = context.Request.IsHttps,
                                     Headers = response.ExportAllHeaders(),
                                     MessageProtocol = MessageProtocol.Http,
+                                    StatusCode = response.StatusCode,
                                     MessageType = MessageType.Response,
                                     RemoteAddress = context.Connection.RemoteIpAddress,
                                     RemotePort = (ushort)context.Connection.RemotePort,
