@@ -157,7 +157,7 @@ namespace CitadelCore.Net.Http
         /// Gets the message type.
         /// </summary>
         /// <remarks>
-        /// The burden of ensuring that this propertyis set correctly, as well as all other
+        /// The burden of ensuring that this property is set correctly, as well as all other
         /// properties, is on the user alone.
         /// </remarks>
         public MessageType MessageType
