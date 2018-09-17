@@ -1,6 +1,8 @@
 # Citadel Core
 Cross platform filtering HTTP/S proxy based on .NET Standard 2.0.
 
+This is the open source version of our filtering proxy. It is now in a feature freeze, and will only receive bug fix patches. Development continues privately at Technik Empire. If you have a commercial interest in this software, please contact us [info@technikempire.com](mailto:info@technikempire.com).
+
 CitadelCore supports proxying of both HTTP/S and Websocket (Ws/Wss) connections. As of v1.4.2, CitadelCore's Websocket proxy passes the [Autobahn Test Suite](https://github.com/TechnikEmpire/CitadelCore/releases/download/v1.4.2/autobahn-testsuite-results.zip).
 
 Note that CitadelCore is an abstract library by design. Since the proxy is designed to be run as a local, transparent filtering proxy, a platform-specific mechanism for diverting traffic back into the proxy must be implemented on each platform. All other logic is implemented in this library. 
