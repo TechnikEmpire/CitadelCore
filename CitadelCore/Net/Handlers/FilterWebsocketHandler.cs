@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright © 2017 Jesse Nicholson
+* Copyright © 2017-Present Jesse Nicholson
 * This Source Code Form is subject to the terms of the Mozilla Public
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -16,6 +16,7 @@ using System.Threading;
 using CitadelCore.Net.Http;
 using CitadelCore.Extensions;
 using System.Collections.Generic;
+using CitadelCore.IO;
 
 namespace CitadelCore.Net.Handlers
 {
@@ -27,13 +28,38 @@ namespace CitadelCore.Net.Handlers
     /// </summary>
     internal class FilterWebsocketHandler : AbstractFilterResponseHandler
     {
-        public FilterWebsocketHandler(MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback) : base(messageBeginCallback, messageEndCallback)
+
+        /// <summary>
+        /// Constructs a FilterWebsocketHandler instance.
+        /// </summary>
+        /// <param name="newMessageCallback">
+        /// Callback used for new messages.
+        /// </param>
+        /// <param name="wholeBodyInspectionCallback">
+        /// Callback used when full-body content inspection is requested on a new message.
+        /// </param>
+        /// <param name="streamInspectionCallback">
+        /// Callback used when streamed content inspection is requested on a new message.
+        /// </param>
+        public FilterWebsocketHandler(NewHttpMessageHandler newMessageCallback, HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback, HttpMessageStreamedInspectionHandler streamInspectionCallback) : base(newMessageCallback, wholeBodyInspectionCallback, streamInspectionCallback)
         {
 
         }
 
+        /// <summary>
+        /// Invoked when this handler is determined to be the best suited to handle the supplied connection.
+        /// </summary>
+        /// <param name="context">
+        /// The HTTP context.
+        /// </param>
+        /// <returns>
+        /// The handling task.
+        /// </returns>
         public override async Task Handle(HttpContext context)
         {
+            ClientWebSocket wsServer = null;
+            System.Net.WebSockets.WebSocket wsClient = null;
+
             try
             {
                 // First we need the URL for this connection, since it's been requested to be upgraded to
@@ -41,27 +67,26 @@ namespace CitadelCore.Net.Handlers
                 var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
 
                 // Need to replate the scheme with appropriate websocket scheme.
-                if(fullUrl.StartsWith("http://"))
+                if(fullUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
                 {
                     fullUrl = "ws://" + fullUrl.Substring(7);
                 }
-                else if(fullUrl.StartsWith("https://"))
+                else if(fullUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
                 {
                     fullUrl = "wss://" + fullUrl.Substring(8);
                 }
 
                 // Next we need to try and parse the URL as a URI, because the websocket client requires
                 // this for connecting upstream.
-                Uri wsUri = null;
 
-                if(!Uri.TryCreate(fullUrl, UriKind.RelativeOrAbsolute, out wsUri))
+                if (!Uri.TryCreate(fullUrl, UriKind.RelativeOrAbsolute, out Uri wsUri))
                 {
                     LoggerProxy.Default.Error("Failed to parse websocket URI.");
                     return;
                 }
 
                 // Create the websocket that's going to connect to the remote server.
-                ClientWebSocket wsServer = new ClientWebSocket();
+                wsServer = new ClientWebSocket();
                 wsServer.Options.Cookies = new System.Net.CookieContainer();
                 wsServer.Options.SetBuffer((int)ushort.MaxValue * 16, (int)ushort.MaxValue * 16);
 
@@ -93,11 +118,9 @@ namespace CitadelCore.Net.Handlers
                         try
                         {
                             wsServer.Options.SetRequestHeader(hdr.Key, hdr.Value.ToString());
-                            Console.WriteLine("Set Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
                         }
                         catch(Exception hdrException)
                         {
-                            Console.WriteLine("Failed Header: {0} ::: {1}", hdr.Key, hdr.Value.ToString());
                             LoggerProxy.Default.Error(hdrException);
                         }
                     }
@@ -105,31 +128,32 @@ namespace CitadelCore.Net.Handlers
 
                 reqHeaderBuilder.Append("\r\n");
 
-                LoggerProxy.Default.Info(string.Format("Connecting websocket to {0}", wsUri.AbsoluteUri));
-
                 // Connect the server websocket to the upstream, remote webserver.
                 await wsServer.ConnectAsync(wsUri, context.RequestAborted);
                 
-                LoggerProxy.Default.Info(String.Format("Connected websocket to {0}", wsUri.AbsoluteUri));
-
                 // Create, via acceptor, the client websocket. This is the local machine's websocket.
-                var wsClient = await context.WebSockets.AcceptWebSocketAsync(wsServer.SubProtocol ?? null);
+                wsClient = await context.WebSockets.AcceptWebSocketAsync(wsServer.SubProtocol ?? null);
+                
+                var msgNfo = new HttpMessageInfo
+                {
+                    Url = wsUri,
+                    IsEncrypted = context.Request.IsHttps,
+                    Headers = context.Request.Headers.ToNameValueCollection(),
+                    MessageProtocol = MessageProtocol.WebSocket,
+                    MessageType = MessageType.Request,
+                    RemoteAddress = context.Connection.RemoteIpAddress,
+                    RemotePort = (ushort)context.Connection.RemotePort,
+                    LocalAddress = context.Connection.LocalIpAddress,
+                    LocalPort = (ushort)context.Connection.LocalPort
+                };
 
-                ProxyNextAction nxtAction = ProxyNextAction.AllowAndIgnoreContentAndResponse;
-                string customResponseContentType = string.Empty;
-                byte[] customResponse = null;
-                m_msgBeginCb?.Invoke(wsUri, reqHeaderBuilder.ToString(), null, context.Request.IsHttps ? MessageType.SecureWebSocket : MessageType.WebSocket, MessageDirection.Request, out nxtAction, out customResponseContentType, out customResponse);
+                _newMessageCb?.Invoke(msgNfo);
 
-                switch(nxtAction)
+                switch(msgNfo.ProxyNextAction)
                 {
                     case ProxyNextAction.DropConnection:
                         {
-                            if(customResponse != null)
-                            {
-
-                            }
-
-                            await wsClient.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
+                            await wsClient.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);                            
                             return;
                         }
                 }
@@ -152,7 +176,7 @@ namespace CitadelCore.Net.Handlers
 
                             if(!wsClient.CloseStatus.HasValue)
                             {
-                                serverStatus = await wsServer.ReceiveAsync(new ArraySegment<byte>(serverBuffer), context.RequestAborted);
+                                serverStatus = await wsServer.ReceiveAsync(new ArraySegment<byte>(serverBuffer), context.RequestAborted);                                
                                 continue;
                             }
 
@@ -221,20 +245,21 @@ namespace CitadelCore.Net.Handlers
             }
             catch(Exception wshe)
             {
-                if(wshe is System.Net.WebSockets.WebSocketException)
-                {
-                    var cast = wshe as System.Net.WebSockets.WebSocketException;
-
-                    Console.WriteLine(cast.WebSocketErrorCode);
-                    if(cast.Data != null)
-                    {
-                        foreach(KeyValuePair<object, object> kvp in cast.Data)
-                        {
-                            Console.WriteLine("{0} ::: {1}", kvp.Key, kvp.Value);
-                        }
-                    }
-                }
                 LoggerProxy.Default.Error(wshe);
+            }
+            finally
+            {
+                if(wsClient != null)
+                {
+                    wsClient.Dispose();
+                    wsClient = null;
+                }
+
+                if (wsServer != null)
+                {
+                    wsServer.Dispose();
+                    wsServer = null;
+                }
             }
         }
     }

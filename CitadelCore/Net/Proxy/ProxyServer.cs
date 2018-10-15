@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright © 2017 Jesse Nicholson
+* Copyright © 2017-Present Jesse Nicholson
 * This Source Code Form is subject to the terms of the Mozilla Public
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -18,25 +18,30 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
 namespace CitadelCore.Net.Proxy
 {
-    
     /// <summary>
     /// The ProxyServer class holds the core, platform-independent filtering proxy logic. 
     /// </summary>
     public abstract class ProxyServer
-    { 
+    {
         /// <summary>
         /// List of proxying web servers generated for this host. Currently there's always going to
         /// be two, one for IPV4 and one for IPV6.
         /// </summary>
-        private List<IWebHost> m_hosts = new List<IWebHost>();
+        private List<IWebHost> _hosts = new List<IWebHost>();
 
-        private IDiverter m_diverter;
+        private IDiverter _diverter;
 
-        private TlsSniConnectionAdapter m_tlsConnAdapter = new TlsSniConnectionAdapter();
+        /// <summary>
+        /// The TlsSniConnetionAdapter that we use to peek the SNI extension from connected TLS
+        /// clients, then spoof a certificate in order to establish a secure connection.
+        /// </summary>
+        private readonly TlsSniConnectionAdapter _tlsConnAdapter;
 
         /// <summary>
         /// Gets the IPV4 endpoint where HTTP connections are being received. This will be ANY:0
@@ -79,91 +84,112 @@ namespace CitadelCore.Net.Proxy
         }
 
         /// <summary>
-        /// Gets whether or not the server is currently running.
+        /// Gets whether or not the server is currently running. 
         /// </summary>
         public bool IsRunning
         {
             get
             {
-                return m_running;
+                return _running;
             }
         }
 
         /// <summary>
-        /// Ref held to firewall callback.
+        /// Ref held to firewall callback. 
         /// </summary>
-        private FirewallCheckCallback m_fwCallback;
+        private FirewallCheckCallback _fwCallback;
 
         /// <summary>
-        /// Flag that indicates if we're running or not.
+        /// Flag that indicates if we're running or not. 
         /// </summary>
-        private volatile bool m_running = false;
+        private volatile bool _running = false;
 
         /// <summary>
         /// For synchronizing startup and shutdown. 
         /// </summary>
-        private object m_startStopLock = new object();
+        private readonly object _startStopLock = new object();
 
         /// <summary>
         /// Creates a new proxy server instance. Really there should only ever be a single instance
         /// created at a time.
         /// </summary>
-        /// <param name="firewallCallback">
-        /// The firewall check callback. Used to allow the user to determine if a binary should have
-        /// its associated traffic pushed through the filter or not.
-        /// </param>
-        /// <param name="messageBeginCallback">
-        /// Message begin callback enables users to inspect and filter messages immediately after
-        /// they begin. Users also have the power to direct how the proxy will continue to handle the
-        /// overall transaction that this message belongs to.
-        /// </param>
-        /// <param name="messageEndCallback">
-        /// Message end callback enables users to inspect and filter messages once they have completed. 
-        /// </param>
+        /// <param name="configuration">
+        /// The proxy server configuration to use.
+        /// </param>       
         /// <exception cref="ArgumentException">
-        /// Will throw if any one of the callbacks are not defined. 
+        /// Will throw if any one of the callbacks in the supplied configuration are not defined. 
         /// </exception>
-        public ProxyServer(FirewallCheckCallback firewallCallback, MessageBeginCallback messageBeginCallback, MessageEndCallback messageEndCallback)
+        public ProxyServer(ProxyServerConfiguration configuration)
         {
-            m_fwCallback = firewallCallback ?? throw new ArgumentException("The firewall callback MUST be defined.");
-            FilterResponseHandlerFactory.Default.MessageBeginCallback = messageBeginCallback ?? throw new ArgumentException("The message begin callback MUST be defined.");
-            FilterResponseHandlerFactory.Default.MessageEndCallback = messageEndCallback ?? throw new ArgumentException("The message end callback MUST be defined.");            
+            _tlsConnAdapter = new TlsSniConnectionAdapter(CreateCertificateStore(configuration.AuthorityName ?? "CitadelCore"));
+            _fwCallback = configuration.FirewallCheckCallback ?? throw new ArgumentException("The firewall callback MUST be defined.", nameof(configuration));
+            FilterResponseHandlerFactory.Default.NewMessageCallback = configuration.NewHttpMessageHandler ?? throw new ArgumentException("The new message callback MUST be defined.", nameof(configuration));
+            FilterResponseHandlerFactory.Default.WholeBodyInspectionCallback = configuration.HttpMessageWholeBodyInspectionHandler ?? throw new ArgumentException("The whole-body content inspection callback MUST be defined.", nameof(configuration));
+            FilterResponseHandlerFactory.Default.StreamedInspectionCallback = configuration.HttpMessageStreamedInspectionHandler ?? throw new ArgumentException("The streaming content inspection callback MUST be defined.", nameof(configuration));
+
+            // Hook the cert verification callback.
+            ServicePointManager.ServerCertificateValidationCallback += CertificateVerificationHandler;
         }
 
         /// <summary>
-        /// Starts the proxy server on both IPV4 and IPV6 address space. 
+        /// Creates a new SpoofedCertStore to be used with the proxy for secure connections.
         /// </summary>
-        public void Start()
+        /// <param name="authorityCommonName">
+        /// The common name to use when generating the certificate authority. Basically, all SSL
+        /// sites will show that they are secured by a certificate authority with this name that is
+        /// supplied here.
+        /// </param>
+        /// <returns>
+        /// </returns>
+        protected virtual ISpoofedCertificateStore CreateCertificateStore(string authorityCommonName)
         {
-            lock(m_startStopLock)
+            return new SpoofedCertStore(authorityCommonName);
+        }
+
+        /// <summary>
+        /// Starts the proxy server on both IPV4 and IPV6 address space.
+        /// </summary>
+        /// <param name="numThreads">
+        /// An optional value that can be used to set the number of threads that the underlying
+        /// packet diversion system will use for packet IO. Defaults to zero. If less than or equal
+        /// to zero, the diverter should automatically choose to use one thread per logical core.
+        /// However, given that diverters are platform specific, this is not guaranteed.
+        /// </param>
+        /// <exception cref="NullReferenceException">
+        /// In the event that the internal kestrel engine doesn't properly initialize, this method
+        /// will throw.
+        /// </exception>
+        public void Start(int numThreads = 0)
+        {
+            lock (_startStopLock)
             {
-                if(m_running)
+                if (_running)
                 {
                     return;
                 }
 
-                m_hosts = new List<IWebHost>()
+                _hosts = new List<IWebHost>()
                 {
                     CreateHost(false),
                     CreateHost(true)
                 };
 
-                m_diverter = CreateDiverter(
+                _diverter = CreateDiverter(
                         V4HttpEndpoint,
                         V4HttpsEndpoint,
                         V6HttpEndpoint,
                         V6HttpsEndpoint
                     );
 
-                m_diverter.ConfirmDenyFirewallAccess = (procPath) =>
+                _diverter.ConfirmDenyFirewallAccess = (procPath) =>
                 {
-                    return m_fwCallback.Invoke(procPath);
+                    return _fwCallback.Invoke(procPath);
                 };
 
-                m_diverter.Start(0);
+                _diverter.Start(numThreads);
 
-                m_running = true;
-            }           
+                _running = true;
+            }
         }
 
         /// <summary>
@@ -191,24 +217,86 @@ namespace CitadelCore.Net.Proxy
         /// </summary>
         public void Stop()
         {
-            lock(m_startStopLock)
+            lock (_startStopLock)
             {
-                if(!m_running)
+                if (!_running)
                 {
                     return;
                 }
 
-                foreach(var host in m_hosts)
+                foreach (var host in _hosts)
                 {
                     host.StopAsync().Wait();
                 }
 
-                m_hosts = new List<IWebHost>();
+                _hosts = new List<IWebHost>();
 
-                m_diverter.Stop();
+                _diverter.Stop();
 
-                m_running = false;
+                _running = false;
             }
+        }
+
+        /// <summary>
+        /// Handles client certification verification.
+        /// </summary>
+        /// <param name="sender">
+        /// Sender. Ignored.
+        /// </param>
+        /// <param name="certificate">
+        /// The certificate to verify.
+        /// </param>
+        /// <param name="chain">
+        /// The certificate chain.
+        /// </param>
+        /// <param name="sslPolicyErrors">
+        /// Errors detected during preverification.
+        /// </param>
+        /// <returns>
+        /// True if the certificate was verified, false otherwise.
+        /// </returns>
+        protected virtual bool CertificateVerificationHandler(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
+        {
+            if (sslPolicyErrors != SslPolicyErrors.None)
+            {
+                try
+                {
+                    // We will tolerate certain chain status issues, such as a failure
+                    // to reach the CRL server.
+                    int acceptable = 0;
+                    foreach (var element in chain.ChainStatus)
+                    {
+                        switch (element.Status)
+                        {
+                            case X509ChainStatusFlags.OfflineRevocation:
+                            case X509ChainStatusFlags.RevocationStatusUnknown:
+                                {
+                                    // We're not going to break websites for people just because the designated
+                                    // CRL is offline.
+                                    ++acceptable;
+                                }
+                                break;
+                        }
+                    }
+
+                    // If, and ONLY IF, all of our existing errors are acceptable, we will adjust the chain
+                    // verification to tolerate those errors and re-run the chain building process.
+                    if (acceptable > 0 && acceptable == chain.ChainStatus.Length)
+                    {
+                        chain.ChainPolicy.VerificationFlags = X509VerificationFlags.IgnoreCertificateAuthorityRevocationUnknown | X509VerificationFlags.IgnoreCtlSignerRevocationUnknown | X509VerificationFlags.IgnoreEndRevocationUnknown | X509VerificationFlags.IgnoreRootRevocationUnknown;
+                        var asX2 = new X509Certificate2(certificate);
+                        return chain.Build(asX2);
+                    }
+                }
+                catch (Exception err)
+                {
+                    LoggerProxy.Default.Error(err);
+                }
+
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -223,6 +311,10 @@ namespace CitadelCore.Net.Proxy
         /// <returns>
         /// An IWebHost that will transparently proxy all requests. 
         /// </returns>
+        /// <exception cref="NullReferenceException">
+        /// In the event that the internal kestrel engine doesn't properly initialize, this method
+        /// will throw.
+        /// </exception>
         private IWebHost CreateHost(bool isV6)
         {
             WebHostBuilder ipWebhostBuilder = new WebHostBuilder();
@@ -237,29 +329,27 @@ namespace CitadelCore.Net.Proxy
 
             // Use Kestrel server.
             ipWebhostBuilder.UseKestrel(opts =>
-            {   
+            {
                 opts.Limits.MaxRequestBodySize = null;
                 opts.Limits.MaxRequestBufferSize = null;
                 opts.Limits.MaxConcurrentConnections = null;
-                opts.Limits.MaxConcurrentUpgradedConnections = null;                
+                opts.Limits.MaxConcurrentUpgradedConnections = null;
 
                 // Listen for HTTPS connections. Keep a reference to the options object so we can get
                 // the chosen port number after we call start.
                 opts.Listen(isV6 ? IPAddress.IPv6Any : IPAddress.Any, 0, listenOpts =>
                 {
-
                     // Plug in our TLS connection adapter. This adapter will handle SNI parsing and
                     // certificate spoofing based on the SNI value.
-                    listenOpts.ConnectionAdapters.Add(m_tlsConnAdapter);
+                    listenOpts.ConnectionAdapters.Add(_tlsConnAdapter);
 
                     // Who doesn't love to kick that old Nagle to the curb?
                     listenOpts.NoDelay = true;
 
-                    // HTTP 2 got cut last minute from 2.1 and MS speculates that it may
-                    // take several releases to get it properly included.
-                    // https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456
-                    listenOpts.Protocols = HttpProtocols.Http1;
-                    
+                    // HTTP 2 got cut last minute from 2.1 and MS speculates that it may take several
+                    // releases to get it properly included. https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456                    
+                    // listenOpts.Protocols = HttpProtocols.Http1;
+
                     httpsListenOptions = listenOpts;
                 });
 
@@ -267,39 +357,56 @@ namespace CitadelCore.Net.Proxy
                 // the chosen port number after we call start.
                 opts.Listen(isV6 ? IPAddress.IPv6Any : IPAddress.Any, 0, listenOpts =>
                 {
-                    // Who doesn't love to kick that old Nagle to the curb?                    
+                    // Who doesn't love to kick that old Nagle to the curb?
                     listenOpts.NoDelay = true;
 
-                    // HTTP 2 got cut last minute from 2.1 and MS speculates that it may
-                    // take several releases to get it properly included.
-                    // https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456
-                    listenOpts.Protocols = HttpProtocols.Http1;
+                    // HTTP 2 got cut last minute from 2.1 and MS speculates that it may take several
+                    // releases to get it properly included. https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456
+                    // listenOpts.Protocols = HttpProtocols.Http1;
 
                     httpListenOptions = listenOpts;
                 });
             });
-            
-            // Configures how we handle requests and errors, etc.            
+
+            // Add compression for responses.
+            ipWebhostBuilder.ConfigureServices(serviceOpts =>
+            {   
+                serviceOpts.AddResponseCompression();
+            });
+
+            ipWebhostBuilder.Configure(cfgApp =>
+            {   
+                cfgApp.UseResponseCompression();
+            });
+
+            // Configures how we handle requests and errors, etc.
             ipWebhostBuilder.UseStartup<Startup>();
-            
+
             // Build host. You needed this comment.
             var vHost = ipWebhostBuilder.Build();
-            
+
             // Start the host. You definitely needed this. It's not until we start the host that the
             // listener endpoints will be resolved. We need that info so we know where our proxy
             // server is running, so we can divert packets to it.
             vHost.Start();
 
             // Since this is post vHost.Start(), we can now grab the EP of the connection.
-            if(isV6)
+            if(httpListenOptions != null)
             {
-                V6HttpEndpoint = httpListenOptions.IPEndPoint;
-                V6HttpsEndpoint = httpsListenOptions.IPEndPoint;
+                if (isV6)
+                {
+                    V6HttpEndpoint = httpListenOptions.IPEndPoint;
+                    V6HttpsEndpoint = httpsListenOptions.IPEndPoint;
+                }
+                else
+                {
+                    V4HttpEndpoint = httpListenOptions.IPEndPoint;
+                    V4HttpsEndpoint = httpsListenOptions.IPEndPoint;
+                }
             }
             else
             {
-                V4HttpEndpoint = httpListenOptions.IPEndPoint;
-                V4HttpsEndpoint = httpsListenOptions.IPEndPoint;
+                throw new NullReferenceException("httpListenOptions is expected to be non-null!");
             }
 
             return vHost;
@@ -313,20 +420,23 @@ namespace CitadelCore.Net.Proxy
         {
             public Startup(IHostingEnvironment env)
             {
-                
             }
 
             public void Configure(IApplicationBuilder app)
             {
+                app.UseResponseCompression();
+
                 // We proxy websockets, so enable this.
-                var wsOpts = new WebSocketOptions();
-                wsOpts.ReceiveBufferSize = (int)(ushort.MaxValue * 5);                
+                var wsOpts = new WebSocketOptions
+                {
+                    ReceiveBufferSize = (int)(ushort.MaxValue * 5)
+                };
                 app.UseWebSockets();
 
                 // Exception handler. Not yet sure what to do here.
                 app.UseExceptionHandler(
                     options =>
-                    {   
+                    {
                         options.Run(
                             async context =>
                             {
@@ -348,16 +458,16 @@ namespace CitadelCore.Net.Proxy
                         );
                     }
                 );
-                
+
                 // Global request handler. Terminates middleware, aka this is the final handler and
                 // middleware will come before this. In the end, we simply ask our factory to give us
                 // the appropriate handler given what the context us, and then let it return a task
                 // we give back to kestrel to see through.
                 app.Run(context =>
-                {   
+                {
                     return Task.Run(async () =>
                     {
-                        var handler = FilterResponseHandlerFactory.Default.GetHandler(context);                        
+                        var handler = FilterResponseHandlerFactory.Default.GetHandler(context);
                         await handler.Handle(context);
                     });
                 });

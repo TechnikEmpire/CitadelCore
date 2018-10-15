@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright © 2017 Jesse Nicholson
+* Copyright © 2017-Present Jesse Nicholson
 * This Source Code Form is subject to the terms of the Mozilla Public
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -7,6 +7,7 @@
 
 using CitadelCore.Crypto;
 using CitadelCore.Extensions;
+using CitadelCore.IO;
 using CitadelCore.Logging;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Adapter.Internal;
@@ -18,7 +19,6 @@ using System.Linq;
 using System.Net.Security;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace CitadelCore.Net.ConnectionAdapters
@@ -35,15 +35,15 @@ namespace CitadelCore.Net.ConnectionAdapters
         /// <summary>
         /// Holds our certificate store. This is responsible for spoofing, storing and retrieving TLS certificates.
         /// </summary>
-        private SpoofedCertStore m_certStore;
+        private ISpoofedCertificateStore _certStore;
 
         /// <summary>
-        /// Returned whenever we're forcing the connection closed, due to error. 
+        /// Returned whenever we're forcing the connection closed, due to error.
         /// </summary>
-        private static ClosedAdaptedConnection s_closedConnection = new ClosedAdaptedConnection();
+        private static readonly ClosedAdaptedConnection s_closedConnection = new ClosedAdaptedConnection();
 
         /// <summary>
-        /// Permitted TLS protocols. 
+        /// Permitted TLS protocols.
         /// </summary>
         /// <remarks>
         /// We enable weak/bad protocols here because some clients in the world still like to use
@@ -56,10 +56,15 @@ namespace CitadelCore.Net.ConnectionAdapters
         /// </remarks>
         private static readonly SslProtocols s_allowedTlsProtocols = SslProtocols.Ssl2 | SslProtocols.Ssl3 | SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12;
 
-        public TlsSniConnectionAdapter()
+        /// <summary>
+        /// Constructs a new TslSniConnectionAdapater instance.
+        /// </summary>
+        /// <param name="store">
+        /// The certificate store to use for spoofing certificates.
+        /// </param>
+        public TlsSniConnectionAdapter(ISpoofedCertificateStore store)
         {
-            LoggerProxy.Default.Error(nameof(TlsSniConnectionAdapter));
-            m_certStore = new SpoofedCertStore();
+            _certStore = store;
         }
 
         public Task<IAdaptedConnection> OnConnectionAsync(ConnectionAdapterContext context)
@@ -89,8 +94,6 @@ namespace CitadelCore.Net.ConnectionAdapters
                                 return s_closedConnection;
                             }
 
-                            LoggerProxy.Default.Info(string.Format("SNI Hostname: {0}", sniHost));
-
                             try
                             {
                                 var sslStream = new SslStream(yourClientStream, true,
@@ -100,7 +103,6 @@ namespace CitadelCore.Net.ConnectionAdapters
                                         // to the upstream connection eventually.
                                         if (certificate != null)
                                         {
-                                            
                                         }
 
                                         return true;
@@ -108,7 +110,7 @@ namespace CitadelCore.Net.ConnectionAdapters
                                     );
 
                                 // Spoof a cert for the extracted SNI hostname.
-                                var spoofedCert = m_certStore.GetSpoofedCertificateForHost(sniHost);
+                                var spoofedCert = _certStore.GetSpoofedCertificateForHost(sniHost);
 
                                 try
                                 {
@@ -137,7 +139,7 @@ namespace CitadelCore.Net.ConnectionAdapters
                                 // Always set the feature even though the cert might be null
                                 context.Features.Set<ITlsConnectionFeature>(new TlsConnectionFeature
                                 {
-                                    ClientCertificate = sslStream.RemoteCertificate != null ? sslStream.RemoteCertificate.ToV2Certificate() : null
+                                    ClientCertificate = sslStream.RemoteCertificate?.ToV2Certificate()
                                 });
 
                                 return new HttpsAdaptedConnection(sslStream);
@@ -171,7 +173,7 @@ namespace CitadelCore.Net.ConnectionAdapters
             private readonly SslStream _sslStream;
 
             public HttpsAdaptedConnection(SslStream sslStream)
-            {   
+            {
                 _sslStream = sslStream;
             }
 
@@ -189,64 +191,6 @@ namespace CitadelCore.Net.ConnectionAdapters
 
             public void Dispose()
             {
-            }
-        }
-
-        internal class ClosedStream : Stream
-        {
-            private static readonly Task<int> ZeroResultTask = Task.FromResult(result: 0);
-
-            public override bool CanRead => true;
-            public override bool CanSeek => false;
-            public override bool CanWrite => false;
-
-            public override long Length
-            {
-                get
-                {
-                    throw new NotSupportedException();
-                }
-            }
-
-            public override long Position
-            {
-                get
-                {
-                    throw new NotSupportedException();
-                }
-                set
-                {
-                    throw new NotSupportedException();
-                }
-            }
-
-            public override void Flush()
-            {
-            }
-
-            public override long Seek(long offset, SeekOrigin origin)
-            {
-                throw new NotSupportedException();
-            }
-
-            public override void SetLength(long value)
-            {
-                throw new NotSupportedException();
-            }
-
-            public override int Read(byte[] buffer, int offset, int count)
-            {
-                return 0;
-            }
-
-            public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-            {
-                return ZeroResultTask;
-            }
-
-            public override void Write(byte[] buffer, int offset, int count)
-            {
-                throw new NotSupportedException();
             }
         }
     }
