@@ -97,14 +97,16 @@ namespace CitadelCore.Net.Handlers
         /// The handling task.
         /// </returns>
         public override async Task Handle(HttpContext context)
-        {   
+        {
+            HttpRequestMessage requestMsg = null;
+
             try
-            {   
+            {
                 // Use helper to get the full, proper URL for the request.
-                //var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
+                // var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
                 var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetEncodedUrl(context.Request);
 
-                // Next we need to try and parse the URL as a URI, because the websocket client
+                // Next we need to try and parse the URL as a URI, because the web client
                 // requires this for connecting upstream.
 
                 if (!Uri.TryCreate(fullUrl, UriKind.RelativeOrAbsolute, out Uri reqUrl))
@@ -131,8 +133,6 @@ namespace CitadelCore.Net.Handlers
                     }
                     catch { }
                 }
-                
-                HttpRequestMessage requestMsg;
 
                 // Match the HTTP version of the client on the upstream request. We don't want to
                 // transparently pass around headers that are wrong for the client's HTTP version.
@@ -171,7 +171,7 @@ namespace CitadelCore.Net.Handlers
                 }
 
                 // Create the message AFTER we give the user a chance to alter things.
-                requestMsg = new HttpRequestMessage(requestMessageNfo.Method, requestMessageNfo.Url);                
+                requestMsg = new HttpRequestMessage(requestMessageNfo.Method, requestMessageNfo.Url);
                 var initialFailedHeaders = requestMsg.PopulateHeaders(requestMessageNfo.Headers);
 
                 // Ensure that we match the protocol of the client!
@@ -293,10 +293,10 @@ namespace CitadelCore.Net.Handlers
                                     // stream.
                                     requestMsg.Content = new StreamContent(context.Request.Body);
                                 }
-                                
+
                             }
                             break;
-                    }                    
+                    }
                 }
 
                 // Ensure that content type is set properly because ByteArrayContent and friends will
@@ -322,225 +322,241 @@ namespace CitadelCore.Net.Handlers
 
                 try
                 {
-                    response = await s_client.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
-                }
-                catch (Exception e)
-                {
-                    LoggerProxy.Default.Error(e);
-                }
-
-                if (response == null)
-                {
-                    return;
-                }
-
-                // Blow away all response headers. We wanna clone these now from our upstream request.
-                context.Response.ClearAllHeaders();
-
-                // Ensure our client's response status code is set to match ours.
-                context.Response.StatusCode = (int)response.StatusCode;
-
-                var responseHeaders = response.ExportAllHeaders();
-
-                bool responseHasZeroContentLength = false;
-                bool responseIsFixedLength = false;
-
-                foreach (var kvp in responseHeaders.ToIHeaderDictionary())
-                {
-                    foreach (var value in kvp.Value)
+                    try
                     {
-                        if (kvp.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
-                        {
-                            responseIsFixedLength = true;
-
-                            if (value.Length <= 0 && value.Equals("0"))
-                            {
-                                responseHasZeroContentLength = true;
-                            }
-                        }
+                        response = await s_client.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
                     }
-                }
-
-                // For later reference...
-                bool upstreamIsHttp1 = upstreamReqVersionMatch != null && upstreamReqVersionMatch.Major == 1 && upstreamReqVersionMatch.Minor == 0;
-
-                // Let's call the message begin handler for the response. Unless of course, the user has asked us NOT to do this.
-                if (requestMessageNfo.ProxyNextAction != ProxyNextAction.AllowAndIgnoreContentAndResponse)
-                {   
-                    var responseMessageNfo = new HttpMessageInfo
+                    catch (Exception e)
                     {
-                        Url = reqUrl,
-                        IsEncrypted = context.Request.IsHttps,
-                        Headers = response.ExportAllHeaders(),
-                        MessageProtocol = MessageProtocol.Http,
-                        HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
-                        StatusCode = response.StatusCode,
-                        MessageType = MessageType.Response,
-                        RemoteAddress = context.Connection.RemoteIpAddress,
-                        RemotePort = (ushort)context.Connection.RemotePort,
-                        LocalAddress = context.Connection.LocalIpAddress,
-                        LocalPort = (ushort)context.Connection.LocalPort
-                    };
+                        LoggerProxy.Default.Error(e);
+                    }
 
-                    _newMessageCb?.Invoke(responseMessageNfo);
-
-                    if (responseMessageNfo.ProxyNextAction == ProxyNextAction.DropConnection)
+                    if (response == null)
                     {
-                        // Apply whatever the user did here and then quit.
-                        context.Response.ClearAllHeaders();
-                        await context.Response.ApplyMessageInfo(responseMessageNfo, context.RequestAborted);
-
                         return;
                     }
 
+                    // Blow away all response headers. We wanna clone these now from our upstream request.
                     context.Response.ClearAllHeaders();
-                    context.Response.PopulateHeaders(responseMessageNfo.Headers);
 
-                    switch (responseMessageNfo.ProxyNextAction)
-                    {
-                        case ProxyNextAction.AllowButRequestContentInspection:
-                            {
-                                using (var upstreamResponseStream = await response.Content.ReadAsStreamAsync())
-                                {
-                                    using (var ms = new MemoryStream())
-                                    {
-                                        await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(upstreamResponseStream, ms, s_maxInMemoryData, context.RequestAborted);
-
-                                        var responseBody = ms.ToArray();
-
-                                        responseMessageNfo = new HttpMessageInfo
-                                        {
-                                            Url = reqUrl,
-                                            IsEncrypted = context.Request.IsHttps,
-                                            Headers = response.ExportAllHeaders(),
-                                            MessageProtocol = MessageProtocol.Http,
-                                            HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
-                                            StatusCode = response.StatusCode,
-                                            MessageType = MessageType.Response,
-                                            RemoteAddress = context.Connection.RemoteIpAddress,
-                                            RemotePort = (ushort)context.Connection.RemotePort,
-                                            LocalAddress = context.Connection.LocalIpAddress,
-                                            LocalPort = (ushort)context.Connection.LocalPort,
-                                            BodyInternal = responseBody
-                                        };
-
-                                        _wholeBodyInspectionCb?.Invoke(responseMessageNfo);
-
-                                        if (responseMessageNfo.ProxyNextAction == ProxyNextAction.DropConnection)
-                                        {
-                                            // Apply whatever the user did here and then quit.
-                                            context.Response.ClearAllHeaders();
-                                            await context.Response.ApplyMessageInfo(responseMessageNfo, context.RequestAborted);
-
-                                            return;
-                                        }
-
-                                        context.Response.ClearAllHeaders();
-                                        context.Response.PopulateHeaders(responseMessageNfo.Headers);
-
-                                        // User inspected but allowed the content. Just write to the response
-                                        // body and then move on with your life fam.
-                                        //
-                                        // However, don't try to write a body if it's zero length. Also, do
-                                        // not try to write a body, even if present, if the status is 204.
-                                        // Kestrel will not let us do this, and so far I can't find a way to
-                                        // remove this technically correct strict-compliance.
-                                        if (!responseHasZeroContentLength && (responseBody.Length > 0 && context.Response.StatusCode != 204))
-                                        {
-                                            // If the request is HTTP1.0, we need to pull all the data so we
-                                            // can properly set the content-length by adding the header in.
-                                            if (upstreamIsHttp1)
-                                            {
-                                                context.Response.Headers.Add("Content-Length", responseBody.Length.ToString());
-                                            }
-
-                                            await context.Response.Body.WriteAsync(responseBody, 0, responseBody.Length);
-                                        }
-                                        else
-                                        {
-                                            if (responseHasZeroContentLength)
-                                            {
-                                                context.Response.Headers.Add("Content-Length", "0");
-                                            }
-                                        }
-
-                                        // Ensure we exit here, because if we fall past this scope then the
-                                        // response is going to get mangled.
-                                        return;
-                                    }
-                                }
-                            }                            
-
-                        case ProxyNextAction.AllowButRequestStreamedContentInspection:
-                            {
-                                responseMessageNfo = new HttpMessageInfo
-                                {
-                                    Url = reqUrl,
-                                    IsEncrypted = context.Request.IsHttps,
-                                    Headers = response.ExportAllHeaders(),
-                                    MessageProtocol = MessageProtocol.Http,
-                                    StatusCode = response.StatusCode,
-                                    HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
-                                    MessageType = MessageType.Response,
-                                    RemoteAddress = context.Connection.RemoteIpAddress,
-                                    RemotePort = (ushort)context.Connection.RemotePort,
-                                    LocalAddress = context.Connection.LocalIpAddress,
-                                    LocalPort = (ushort)context.Connection.LocalPort
-                                };
-
-                                using (var responseStream = await response.Content.ReadAsStreamAsync())
-                                {
-                                    // We have a body and the user wants to just stream-inspect it.
-                                    using (var wrappedStream = new InspectionStream(responseMessageNfo, responseStream))
-                                    {
-                                        wrappedStream.StreamRead = OnWrappedStreamRead;
-                                        wrappedStream.StreamWrite = OnWrappedStreamWrite;
-
-                                        await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(wrappedStream, context.Response.Body, null, context.RequestAborted);
-                                    }
-                                }
-
-                                return;
-                            }
-                    }
-                    
-                } // if (requestMessageNfo.ProxyNextAction != ProxyNextAction.AllowAndIgnoreContentAndResponse)                
-
-
-                // If we made it here, then the user just wants to let the response be streamed in
-                // without any inspection etc, so do exactly that.
-                using (var responseStream = await response.Content.ReadAsStreamAsync())
-                {
+                    // Ensure our client's response status code is set to match ours.
                     context.Response.StatusCode = (int)response.StatusCode;
-                    context.Response.PopulateHeaders(response.ExportAllHeaders());
 
-                    if (!responseHasZeroContentLength && (upstreamIsHttp1 || responseIsFixedLength))
+                    var responseHeaders = response.ExportAllHeaders();
+
+                    bool responseHasZeroContentLength = false;
+                    bool responseIsFixedLength = false;
+
+                    foreach (var kvp in responseHeaders.ToIHeaderDictionary())
                     {
-                        using (var ms = new MemoryStream())
+                        foreach (var value in kvp.Value)
                         {
-                            await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(responseStream, ms, s_maxInMemoryData, context.RequestAborted);
+                            if (kvp.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
+                            {
+                                responseIsFixedLength = true;
 
-                            var responseBody = ms.ToArray();
-
-                            context.Response.Headers.Remove("Content-Length");
-
-                            context.Response.Headers.Add("Content-Length", responseBody.Length.ToString());
-
-                            await context.Response.Body.WriteAsync(responseBody, 0, responseBody.Length);
+                                if (value.Length <= 0 && value.Equals("0"))
+                                {
+                                    responseHasZeroContentLength = true;
+                                }
+                            }
                         }
                     }
-                    else
-                    {
-                        context.Response.Headers.Remove("Content-Length");
 
-                        if (responseHasZeroContentLength)
+                    // For later reference...
+                    bool upstreamIsHttp1 = upstreamReqVersionMatch != null && upstreamReqVersionMatch.Major == 1 && upstreamReqVersionMatch.Minor == 0;
+
+                    // Let's call the message begin handler for the response. Unless of course, the user has asked us NOT to do this.
+                    if (requestMessageNfo.ProxyNextAction != ProxyNextAction.AllowAndIgnoreContentAndResponse)
+                    {
+                        var responseMessageNfo = new HttpMessageInfo
                         {
-                            context.Response.Headers.Add("Content-Length", "0");
+                            Url = reqUrl,
+                            IsEncrypted = context.Request.IsHttps,
+                            Headers = response.ExportAllHeaders(),
+                            MessageProtocol = MessageProtocol.Http,
+                            HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
+                            StatusCode = response.StatusCode,
+                            MessageType = MessageType.Response,
+                            RemoteAddress = context.Connection.RemoteIpAddress,
+                            RemotePort = (ushort)context.Connection.RemotePort,
+                            LocalAddress = context.Connection.LocalIpAddress,
+                            LocalPort = (ushort)context.Connection.LocalPort
+                        };
+
+                        _newMessageCb?.Invoke(responseMessageNfo);
+
+                        if (responseMessageNfo.ProxyNextAction == ProxyNextAction.DropConnection)
+                        {
+                            // Apply whatever the user did here and then quit.
+                            context.Response.ClearAllHeaders();
+                            await context.Response.ApplyMessageInfo(responseMessageNfo, context.RequestAborted);
+
+                            return;
+                        }
+
+                        context.Response.ClearAllHeaders();
+                        context.Response.PopulateHeaders(responseMessageNfo.Headers);
+                        context.Response.StatusCode = (int)response.StatusCode;
+
+                        switch (responseMessageNfo.ProxyNextAction)
+                        {
+                            case ProxyNextAction.AllowButRequestContentInspection:
+                                {
+                                    using (var upstreamResponseStream = await response.Content.ReadAsStreamAsync())
+                                    {
+                                        using (var ms = new MemoryStream())
+                                        {
+                                            await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(upstreamResponseStream, ms, s_maxInMemoryData, context.RequestAborted);
+
+                                            var responseBody = ms.ToArray();
+
+                                            responseMessageNfo = new HttpMessageInfo
+                                            {
+                                                Url = reqUrl,
+                                                IsEncrypted = context.Request.IsHttps,
+                                                Headers = response.ExportAllHeaders(),
+                                                MessageProtocol = MessageProtocol.Http,
+                                                HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
+                                                StatusCode = response.StatusCode,
+                                                MessageType = MessageType.Response,
+                                                RemoteAddress = context.Connection.RemoteIpAddress,
+                                                RemotePort = (ushort)context.Connection.RemotePort,
+                                                LocalAddress = context.Connection.LocalIpAddress,
+                                                LocalPort = (ushort)context.Connection.LocalPort,
+                                                BodyInternal = responseBody
+                                            };
+
+                                            _wholeBodyInspectionCb?.Invoke(responseMessageNfo);
+
+                                            if (responseMessageNfo.ProxyNextAction == ProxyNextAction.DropConnection)
+                                            {
+                                                // Apply whatever the user did here and then quit.
+                                                context.Response.ClearAllHeaders();
+                                                await context.Response.ApplyMessageInfo(responseMessageNfo, context.RequestAborted);
+
+                                                return;
+                                            }
+
+                                            context.Response.ClearAllHeaders();
+                                            context.Response.PopulateHeaders(responseMessageNfo.Headers);
+
+                                            // User inspected but allowed the content. Just write to the response
+                                            // body and then move on with your life fam.
+                                            //
+                                            // However, don't try to write a body if it's zero length. Also, do
+                                            // not try to write a body, even if present, if the status is 204.
+                                            // Kestrel will not let us do this, and so far I can't find a way to
+                                            // remove this technically correct strict-compliance.
+                                            if (!responseHasZeroContentLength && (responseBody.Length > 0 && context.Response.StatusCode != 204))
+                                            {
+                                                // If the request is HTTP1.0, we need to pull all the data so we
+                                                // can properly set the content-length by adding the header in.
+                                                if (upstreamIsHttp1)
+                                                {
+                                                    context.Response.Headers.Add("Content-Length", responseBody.Length.ToString());
+                                                }
+
+                                                await context.Response.Body.WriteAsync(responseBody, 0, responseBody.Length);
+                                            }
+                                            else
+                                            {
+                                                if (responseHasZeroContentLength)
+                                                {
+                                                    context.Response.Headers.Add("Content-Length", "0");
+                                                }
+                                            }
+
+                                            // Ensure we exit here, because if we fall past this scope then the
+                                            // response is going to get mangled.
+                                            return;
+                                        }
+                                    }
+                                }
+
+                            case ProxyNextAction.AllowButRequestStreamedContentInspection:
+                                {
+                                    responseMessageNfo = new HttpMessageInfo
+                                    {
+                                        Url = reqUrl,
+                                        IsEncrypted = context.Request.IsHttps,
+                                        Headers = response.ExportAllHeaders(),
+                                        MessageProtocol = MessageProtocol.Http,
+                                        StatusCode = response.StatusCode,
+                                        HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
+                                        MessageType = MessageType.Response,
+                                        RemoteAddress = context.Connection.RemoteIpAddress,
+                                        RemotePort = (ushort)context.Connection.RemotePort,
+                                        LocalAddress = context.Connection.LocalIpAddress,
+                                        LocalPort = (ushort)context.Connection.LocalPort
+                                    };
+
+                                    using (var responseStream = await response.Content.ReadAsStreamAsync())
+                                    {
+                                        // We have a body and the user wants to just stream-inspect it.
+                                        using (var wrappedStream = new InspectionStream(responseMessageNfo, responseStream))
+                                        {
+                                            wrappedStream.StreamRead = OnWrappedStreamRead;
+                                            wrappedStream.StreamWrite = OnWrappedStreamWrite;
+
+                                            await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(wrappedStream, context.Response.Body, null, context.RequestAborted);
+                                        }
+                                    }
+
+                                    return;
+                                }
+                        }
+
+                    } // if (requestMessageNfo.ProxyNextAction != ProxyNextAction.AllowAndIgnoreContentAndResponse)                
+
+
+                    // If we made it here, then the user just wants to let the response be streamed in
+                    // without any inspection etc, so do exactly that.
+                    using (var responseStream = await response.Content.ReadAsStreamAsync())
+                    {
+                        context.Response.StatusCode = (int)response.StatusCode;
+                        context.Response.PopulateHeaders(response.ExportAllHeaders());
+
+                        if (!responseHasZeroContentLength && (upstreamIsHttp1 || responseIsFixedLength))
+                        {
+                            using (var ms = new MemoryStream())
+                            {
+                                await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(responseStream, ms, s_maxInMemoryData, context.RequestAborted);
+
+                                var responseBody = ms.ToArray();
+
+                                context.Response.Headers.Remove("Content-Length");
+
+                                context.Response.Headers.Add("Content-Length", responseBody.Length.ToString());
+
+                                await context.Response.Body.WriteAsync(responseBody, 0, responseBody.Length);
+                            }
                         }
                         else
                         {
-                            await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(responseStream, context.Response.Body, null, context.RequestAborted);
+                            context.Response.Headers.Remove("Content-Length");
+
+                            if (responseHasZeroContentLength)
+                            {
+                                context.Response.Headers.Add("Content-Length", "0");
+                            }
+                            else
+                            {
+                                await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(responseStream, context.Response.Body, null, context.RequestAborted);
+                            }
                         }
+                    }
+                }
+                finally
+                {
+                    if (response != null)
+                    {
+                        // Blow away the managed response before we leave, always!
+                        try
+                        {
+                            response.Dispose();
+                        }
+                        catch { }
                     }
                 }
             }
@@ -550,6 +566,18 @@ namespace CitadelCore.Net.Handlers
                 {
                     // Ignore task cancelled exceptions.
                     LoggerProxy.Default.Error(e);
+                }
+            }
+            finally
+            {
+                if (requestMsg != null)
+                {
+                    // Blow away the managed response before we leave, always!
+                    try
+                    {
+                        requestMsg.Dispose();
+                    }
+                    catch { }
                 }
             }
         }

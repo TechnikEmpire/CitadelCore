@@ -17,6 +17,8 @@ using CitadelCore.Net.Http;
 using CitadelCore.Extensions;
 using System.Collections.Generic;
 using CitadelCore.IO;
+using System.Net.Http;
+using System.Text.RegularExpressions;
 
 namespace CitadelCore.Net.Handlers
 {
@@ -28,6 +30,7 @@ namespace CitadelCore.Net.Handlers
     /// </summary>
     internal class FilterWebsocketHandler : AbstractFilterResponseHandler
     {
+        private static readonly Regex s_httpVerRegex = new Regex("([0-9]+\\.[0-9]+)", RegexOptions.Compiled | RegexOptions.ECMAScript);
 
         /// <summary>
         /// Constructs a FilterWebsocketHandler instance.
@@ -134,11 +137,23 @@ namespace CitadelCore.Net.Handlers
                 // Create, via acceptor, the client websocket. This is the local machine's websocket.
                 wsClient = await context.WebSockets.AcceptWebSocketAsync(wsServer.SubProtocol ?? null);
                 
+                // Match the HTTP version of the client on the upstream request. We don't want to
+                // transparently pass around headers that are wrong for the client's HTTP version.
+                Version upstreamReqVersionMatch = null;
+
+                Match match = s_httpVerRegex.Match(context.Request.Protocol);
+                if (match != null && match.Success)
+                {
+                    upstreamReqVersionMatch = Version.Parse(match.Value);
+                }
+
                 var msgNfo = new HttpMessageInfo
                 {
                     Url = wsUri,
+                    Method = new HttpMethod(context.Request.Method),
                     IsEncrypted = context.Request.IsHttps,
                     Headers = context.Request.Headers.ToNameValueCollection(),
+                    HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
                     MessageProtocol = MessageProtocol.WebSocket,
                     MessageType = MessageType.Request,
                     RemoteAddress = context.Connection.RemoteIpAddress,

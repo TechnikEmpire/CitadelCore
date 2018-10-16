@@ -58,7 +58,7 @@
     <PackageReference Include="Portable.BouncyCastle" Version="1.8.3" />
     <PackageReference Include="StreamExtended" Version="[1.0.81]" />
     <PackageReference Include="System.Memory" Version="4.5.1" />
-    <PackageReference Include="System.Net.WebSockets.Client.Managed" Version="1.0.20" />
+    <PackageReference Include="System.Net.WebSockets.Client.Managed" Version="1.0.22" />
   </ItemGroup>
 
 
