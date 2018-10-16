@@ -12,6 +12,7 @@ using System;
 using System.Collections.Specialized;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 
 namespace CitadelCore.Net.Http
 {
@@ -29,6 +30,14 @@ namespace CitadelCore.Net.Http
     public class HttpMessageInfo
     {
         /// <summary>
+        /// Used to increment the <seealso cref="MessageId"/> property.
+        /// </summary>
+        /// <remarks>
+        /// Since this is unsigned, overflow will cause us to roll over to 0.
+        /// </remarks>
+        private static long s_messageIdGen = 0;
+
+        /// <summary>
         /// Gets or sets the originating message URL.
         /// </summary>
         public Uri Url
@@ -36,6 +45,20 @@ namespace CitadelCore.Net.Http
             get;
             set;
         } = null;
+
+        /// <summary>
+        /// Gets the unique message Id.
+        /// </summary>
+        /// <remarks>
+        /// Various api's, such as the stream inspection API, do not provide us with a way to persist
+        /// and track unique connections outside of the library. So, this property was added to
+        /// enable this.
+        /// </remarks>
+        public uint MessageId
+        {
+            get;
+            internal set;
+        } = (uint)Interlocked.Increment(ref s_messageIdGen);
 
         /// <summary>
         /// Gets or sets the message method.

@@ -200,6 +200,10 @@ namespace CitadelCore.Net.Handlers
                                         requestMessageNfo = new HttpMessageInfo
                                         {
                                             Url = reqUrl,
+                                            // We recycle the very first unique message ID (auto generated) in order
+                                            // to enable the library user to track this single connection across
+                                            // multiple callbacks.
+                                            MessageId = requestMessageNfo.MessageId,
                                             Method = new HttpMethod(context.Request.Method),
                                             IsEncrypted = context.Request.IsHttps,
                                             Headers = context.Request.Headers.ToNameValueCollection(),
@@ -256,6 +260,7 @@ namespace CitadelCore.Net.Handlers
                                 requestMessageNfo = new HttpMessageInfo
                                 {
                                     Url = reqUrl,
+                                    MessageId = requestMessageNfo.MessageId,
                                     Method = new HttpMethod(context.Request.Method),
                                     IsEncrypted = context.Request.IsHttps,
                                     Headers = context.Request.Headers.ToNameValueCollection(),
@@ -365,6 +370,7 @@ namespace CitadelCore.Net.Handlers
                         var responseMessageNfo = new HttpMessageInfo
                         {
                             Url = reqUrl,
+                            MessageId = requestMessageNfo.MessageId,
                             IsEncrypted = context.Request.IsHttps,
                             Headers = response.ExportAllHeaders(),
                             MessageProtocol = MessageProtocol.Http,
@@ -407,6 +413,7 @@ namespace CitadelCore.Net.Handlers
                                             responseMessageNfo = new HttpMessageInfo
                                             {
                                                 Url = reqUrl,
+                                                MessageId = requestMessageNfo.MessageId,
                                                 IsEncrypted = context.Request.IsHttps,
                                                 Headers = response.ExportAllHeaders(),
                                                 MessageProtocol = MessageProtocol.Http,
@@ -474,6 +481,7 @@ namespace CitadelCore.Net.Handlers
                                     responseMessageNfo = new HttpMessageInfo
                                     {
                                         Url = reqUrl,
+                                        MessageId = requestMessageNfo.MessageId,
                                         IsEncrypted = context.Request.IsHttps,
                                         Headers = response.ExportAllHeaders(),
                                         MessageProtocol = MessageProtocol.Http,
