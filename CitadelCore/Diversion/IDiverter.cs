@@ -10,12 +10,12 @@ using CitadelCore.Net.Proxy;
 namespace CitadelCore.Diversion
 {
     /// <summary>
-    /// Defines the interface for a platform-specific packet diverter. 
+    /// Defines the interface for a platform-specific packet diverter.
     /// </summary>
     public interface IDiverter
     {
         /// <summary>
-        /// Gets whether or not the diverter is presently operating and diverting traffic. 
+        /// Gets whether or not the diverter is presently operating and diverting traffic.
         /// </summary>
         bool IsRunning
         {

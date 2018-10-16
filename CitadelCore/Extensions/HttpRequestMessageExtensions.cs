@@ -11,10 +11,8 @@ using CitadelCore.Net.Http;
 using CitadelCore.Util;
 using System;
 using System.Collections.Specialized;
-using System.IO;
 using System.Net.Http;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace CitadelCore.Extensions
 {

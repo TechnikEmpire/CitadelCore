@@ -12,17 +12,14 @@ using CitadelCore.Net.Http;
 using CitadelCore.Net.Proxy;
 using Microsoft.AspNetCore.Http;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace CitadelCore.Net.Handlers
-{   
+{
     /// <summary>
     /// The FilterHttpResponse handler is designed to proxy HTTP requests and responses, while
     /// providing an opportunity for users to inspect and optionally filter and modifiy requests and
@@ -31,9 +28,9 @@ namespace CitadelCore.Net.Handlers
     internal class FilterHttpResponseHandler : AbstractFilterResponseHandler
     {
         /// <summary>
-        /// We pass this in to stream copy operations whenever the user has asked us to pull
-        /// a payload from the net into memory. We set a hard limit of ~128 megs simply to
-        /// avoid being vulnerable to an attack that would balloon memory consumption.
+        /// We pass this in to stream copy operations whenever the user has asked us to pull a
+        /// payload from the net into memory. We set a hard limit of ~128 megs simply to avoid being
+        /// vulnerable to an attack that would balloon memory consumption.
         /// </summary>
         private static readonly long s_maxInMemoryData = 128000000;
 
@@ -54,7 +51,7 @@ namespace CitadelCore.Net.Handlers
             ServicePointManager.CheckCertificateRevocationList = true;
             ServicePointManager.ReusePort = true;
             ServicePointManager.UseNagleAlgorithm = false;
-            
+
             // We need UseCookies set to false here. We then need to set per-request cookies by
             // manually adding the "Cookie" header. If we don't have UseCookies set to false here,
             // this will not work.
@@ -66,7 +63,7 @@ namespace CitadelCore.Net.Handlers
                 AllowAutoRedirect = false,
                 Proxy = null
             };
-            
+
             s_client = new HttpClient(handler);
         }
 
@@ -84,7 +81,6 @@ namespace CitadelCore.Net.Handlers
         /// </param>
         public FilterHttpResponseHandler(NewHttpMessageHandler newMessageCallback, HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback, HttpMessageStreamedInspectionHandler streamInspectionCallback) : base(newMessageCallback, wholeBodyInspectionCallback, streamInspectionCallback)
         {
-
         }
 
         /// <summary>
@@ -102,12 +98,11 @@ namespace CitadelCore.Net.Handlers
 
             try
             {
-                // Use helper to get the full, proper URL for the request.
-                // var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
+                // Use helper to get the full, proper URL for the request. var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
                 var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetEncodedUrl(context.Request);
 
-                // Next we need to try and parse the URL as a URI, because the web client
-                // requires this for connecting upstream.
+                // Next we need to try and parse the URL as a URI, because the web client requires
+                // this for connecting upstream.
 
                 if (!Uri.TryCreate(fullUrl, UriKind.RelativeOrAbsolute, out Uri reqUrl))
                 {
@@ -144,7 +139,7 @@ namespace CitadelCore.Net.Handlers
                     upstreamReqVersionMatch = Version.Parse(match.Value);
                 }
 
-                // Let's do our first call to message begin for the request side.                
+                // Let's do our first call to message begin for the request side.
                 var requestMessageNfo = new HttpMessageInfo
                 {
                     Url = reqUrl,
@@ -197,10 +192,10 @@ namespace CitadelCore.Net.Handlers
 
                                     var requestBody = ms.ToArray();
 
-                                    // If we don't have a body, there's no sense in calling the message end callback.
+                                    // If we don't have a body, there's no sense in calling the
+                                    // message end callback.
                                     if (requestBody.Length > 0)
                                     {
-
                                         // We'll now call the message end function for the request side.
                                         requestMessageNfo = new HttpMessageInfo
                                         {
@@ -222,22 +217,22 @@ namespace CitadelCore.Net.Handlers
 
                                         if (requestMessageNfo.ProxyNextAction == ProxyNextAction.DropConnection)
                                         {
-                                            // User wants to block this request after inspecting the content.
-                                            // Apply whatever the user did here and then quit.
+                                            // User wants to block this request after inspecting the
+                                            // content. Apply whatever the user did here and then quit.
                                             context.Response.ClearAllHeaders();
                                             await context.Response.ApplyMessageInfo(requestMessageNfo, context.RequestAborted);
 
                                             return;
                                         }
 
-                                        // Since the user may have modified things, we'll now re-create
-                                        // the request no matter what.
+                                        // Since the user may have modified things, we'll now
+                                        // re-create the request no matter what.
                                         requestMsg = new HttpRequestMessage(requestMessageNfo.Method, requestMessageNfo.Url);
                                         initialFailedHeaders = requestMsg.PopulateHeaders(requestMessageNfo.Headers);
 
-                                        // Set our content, even if it's empty. Don't worry about ByteArrayContent
-                                        // and friends setting other headers, we're gonna blow relevant headers away
-                                        // below and then set them properly.
+                                        // Set our content, even if it's empty. Don't worry about
+                                        // ByteArrayContent and friends setting other headers, we're
+                                        // gonna blow relevant headers away below and then set them properly.
                                         requestMsg.Content = new ByteArrayContent(requestBody);
                                         requestMsg.Content.Headers.Clear();
 
@@ -288,23 +283,20 @@ namespace CitadelCore.Net.Handlers
                             {
                                 if (context.Request.ContentLength.HasValue && context.Request.ContentLength.Value > 0)
                                 {
-                                    // We have a body, but the user doesn't want to inspect it.
-                                    // So, we'll just set our content to wrap the context's input
-                                    // stream.
+                                    // We have a body, but the user doesn't want to inspect it. So,
+                                    // we'll just set our content to wrap the context's input stream.
                                     requestMsg.Content = new StreamContent(context.Request.Body);
                                 }
-
                             }
                             break;
                     }
                 }
 
                 // Ensure that content type is set properly because ByteArrayContent and friends will
-                // modify these fields.
-                // To explain these further, these headers almost always fail because
-                // they apply to the .Content property only (content-specific headers),
-                // so once we have a .Content property created, we'll go ahead and
-                // pour over the failed headers and try to apply to them to the content.
+                // modify these fields. To explain these further, these headers almost always fail
+                // because they apply to the .Content property only (content-specific headers), so
+                // once we have a .Content property created, we'll go ahead and pour over the failed
+                // headers and try to apply to them to the content.
                 initialFailedHeaders = requestMsg.PopulateHeaders(initialFailedHeaders);
 #if VERBOSE_WARNINGS
                 foreach (string key in initialFailedHeaders)
@@ -366,7 +358,8 @@ namespace CitadelCore.Net.Handlers
                     // For later reference...
                     bool upstreamIsHttp1 = upstreamReqVersionMatch != null && upstreamReqVersionMatch.Major == 1 && upstreamReqVersionMatch.Minor == 0;
 
-                    // Let's call the message begin handler for the response. Unless of course, the user has asked us NOT to do this.
+                    // Let's call the message begin handler for the response. Unless of course, the
+                    // user has asked us NOT to do this.
                     if (requestMessageNfo.ProxyNextAction != ProxyNextAction.AllowAndIgnoreContentAndResponse)
                     {
                         var responseMessageNfo = new HttpMessageInfo
@@ -441,17 +434,19 @@ namespace CitadelCore.Net.Handlers
                                             context.Response.ClearAllHeaders();
                                             context.Response.PopulateHeaders(responseMessageNfo.Headers);
 
-                                            // User inspected but allowed the content. Just write to the response
-                                            // body and then move on with your life fam.
+                                            // User inspected but allowed the content. Just write to
+                                            // the response body and then move on with your life fam.
                                             //
-                                            // However, don't try to write a body if it's zero length. Also, do
-                                            // not try to write a body, even if present, if the status is 204.
-                                            // Kestrel will not let us do this, and so far I can't find a way to
-                                            // remove this technically correct strict-compliance.
+                                            // However, don't try to write a body if it's zero
+                                            // length. Also, do not try to write a body, even if
+                                            // present, if the status is 204. Kestrel will not let us
+                                            // do this, and so far I can't find a way to remove this
+                                            // technically correct strict-compliance.
                                             if (!responseHasZeroContentLength && (responseBody.Length > 0 && context.Response.StatusCode != 204))
                                             {
-                                                // If the request is HTTP1.0, we need to pull all the data so we
-                                                // can properly set the content-length by adding the header in.
+                                                // If the request is HTTP1.0, we need to pull all the
+                                                // data so we can properly set the content-length by
+                                                // adding the header in.
                                                 if (upstreamIsHttp1)
                                                 {
                                                     context.Response.Headers.Add("Content-Length", responseBody.Length.ToString());
@@ -467,8 +462,8 @@ namespace CitadelCore.Net.Handlers
                                                 }
                                             }
 
-                                            // Ensure we exit here, because if we fall past this scope then the
-                                            // response is going to get mangled.
+                                            // Ensure we exit here, because if we fall past this
+                                            // scope then the response is going to get mangled.
                                             return;
                                         }
                                     }
@@ -506,12 +501,10 @@ namespace CitadelCore.Net.Handlers
                                     return;
                                 }
                         }
+                    } // if (requestMessageNfo.ProxyNextAction != ProxyNextAction.AllowAndIgnoreContentAndResponse)
 
-                    } // if (requestMessageNfo.ProxyNextAction != ProxyNextAction.AllowAndIgnoreContentAndResponse)                
-
-
-                    // If we made it here, then the user just wants to let the response be streamed in
-                    // without any inspection etc, so do exactly that.
+                    // If we made it here, then the user just wants to let the response be streamed
+                    // in without any inspection etc, so do exactly that.
                     using (var responseStream = await response.Content.ReadAsStreamAsync())
                     {
                         context.Response.StatusCode = (int)response.StatusCode;

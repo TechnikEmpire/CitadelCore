@@ -278,7 +278,6 @@ namespace CitadelCore.IO
                 }
                 catch { }
 
-
                 try
                 {
                     _innerStream.Dispose();

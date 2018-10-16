@@ -11,7 +11,7 @@ using System.Collections.Specialized;
 namespace CitadelCore.Extensions
 {
     /// <summary>
-    /// Extensions for <see cref="IHeaderDictionary"/> instances.
+    /// Extensions for <see cref="IHeaderDictionary" /> instances.
     /// </summary>
     internal static class IHeaderDictionaryExtensions
     {
@@ -27,7 +27,7 @@ namespace CitadelCore.Extensions
         public static NameValueCollection ToNameValueCollection(this IHeaderDictionary dict)
         {
             var collection = new NameValueCollection();
-            
+
             foreach (var kvp in dict)
             {
                 foreach (var sv in kvp.Value)

@@ -12,7 +12,7 @@ using System.Collections.Specialized;
 namespace CitadelCore.Extensions
 {
     /// <summary>
-    /// Extensions for the <see cref="NameValueCollection"/> class.
+    /// Extensions for the <see cref="NameValueCollection" /> class.
     /// </summary>
     internal static class NameValueCollectionExtensions
     {

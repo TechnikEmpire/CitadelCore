@@ -16,17 +16,17 @@ namespace CitadelCore.Extensions
     public static class IPAddressExtensions
     {
         /// <summary>
-        /// Determines whether or not the address is an IPV4 private address. 
+        /// Determines whether or not the address is an IPV4 private address.
         /// </summary>
         /// <param name="address">
-        /// This address. 
+        /// This address.
         /// </param>
         /// <returns>
-        /// True if this address is IPV4 private, false otherwise. 
+        /// True if this address is IPV4 private, false otherwise.
         /// </returns>
         public static bool IsPrivateIpv4Address(this IPAddress address)
         {
-            if(address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+            if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
             {
                 return false;
             }

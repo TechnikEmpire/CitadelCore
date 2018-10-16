@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 namespace CitadelCore.Net.Handlers
 {
     /// <summary>
-    /// Enforces a pattern of requiring message handlers on all filtering response handlers. 
+    /// Enforces a pattern of requiring message handlers on all filtering response handlers.
     /// </summary>
     internal abstract class AbstractFilterResponseHandler
     {

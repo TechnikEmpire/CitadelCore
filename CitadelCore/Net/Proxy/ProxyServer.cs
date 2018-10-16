@@ -25,7 +25,7 @@ using System.Threading.Tasks;
 namespace CitadelCore.Net.Proxy
 {
     /// <summary>
-    /// The ProxyServer class holds the core, platform-independent filtering proxy logic. 
+    /// The ProxyServer class holds the core, platform-independent filtering proxy logic.
     /// </summary>
     public abstract class ProxyServer
     {
@@ -84,7 +84,7 @@ namespace CitadelCore.Net.Proxy
         }
 
         /// <summary>
-        /// Gets whether or not the server is currently running. 
+        /// Gets whether or not the server is currently running.
         /// </summary>
         public bool IsRunning
         {
@@ -95,17 +95,17 @@ namespace CitadelCore.Net.Proxy
         }
 
         /// <summary>
-        /// Ref held to firewall callback. 
+        /// Ref held to firewall callback.
         /// </summary>
         private FirewallCheckCallback _fwCallback;
 
         /// <summary>
-        /// Flag that indicates if we're running or not. 
+        /// Flag that indicates if we're running or not.
         /// </summary>
         private volatile bool _running = false;
 
         /// <summary>
-        /// For synchronizing startup and shutdown. 
+        /// For synchronizing startup and shutdown.
         /// </summary>
         private readonly object _startStopLock = new object();
 
@@ -115,9 +115,9 @@ namespace CitadelCore.Net.Proxy
         /// </summary>
         /// <param name="configuration">
         /// The proxy server configuration to use.
-        /// </param>       
+        /// </param>
         /// <exception cref="ArgumentException">
-        /// Will throw if any one of the callbacks in the supplied configuration are not defined. 
+        /// Will throw if any one of the callbacks in the supplied configuration are not defined.
         /// </exception>
         public ProxyServer(ProxyServerConfiguration configuration)
         {
@@ -193,27 +193,27 @@ namespace CitadelCore.Net.Proxy
         }
 
         /// <summary>
-        /// Internal call to create the platform specific packet diverter. 
+        /// Internal call to create the platform specific packet diverter.
         /// </summary>
         /// <param name="ipv4HttpEp">
-        /// The endpoint where the proxy is listening for IPV4 HTTP connections. 
+        /// The endpoint where the proxy is listening for IPV4 HTTP connections.
         /// </param>
         /// <param name="ipv4HttpsEp">
-        /// The endpoint where the proxy is listening for IPV4 HTTPS connections. 
+        /// The endpoint where the proxy is listening for IPV4 HTTPS connections.
         /// </param>
         /// <param name="ipv6HttpEp">
-        /// The endpoint where the proxy is listening for IPV6 HTTP connections. 
+        /// The endpoint where the proxy is listening for IPV6 HTTP connections.
         /// </param>
         /// <param name="ipv6HttpsEp">
-        /// The endpoint where the proxy is listening for IPV6 HTTPS connections. 
+        /// The endpoint where the proxy is listening for IPV6 HTTPS connections.
         /// </param>
         /// <returns>
-        /// The platform specific diverter. 
+        /// The platform specific diverter.
         /// </returns>
         protected abstract IDiverter CreateDiverter(IPEndPoint ipv4HttpEp, IPEndPoint ipv4HttpsEp, IPEndPoint ipv6HttpEp, IPEndPoint ipv6HttpsEp);
 
         /// <summary>
-        /// Stops any running proxy server listeners and allows them to be disposed. 
+        /// Stops any running proxy server listeners and allows them to be disposed.
         /// </summary>
         public void Stop()
         {
@@ -261,8 +261,8 @@ namespace CitadelCore.Net.Proxy
             {
                 try
                 {
-                    // We will tolerate certain chain status issues, such as a failure
-                    // to reach the CRL server.
+                    // We will tolerate certain chain status issues, such as a failure to reach the
+                    // CRL server.
                     int acceptable = 0;
                     foreach (var element in chain.ChainStatus)
                     {
@@ -271,16 +271,16 @@ namespace CitadelCore.Net.Proxy
                             case X509ChainStatusFlags.OfflineRevocation:
                             case X509ChainStatusFlags.RevocationStatusUnknown:
                                 {
-                                    // We're not going to break websites for people just because the designated
-                                    // CRL is offline.
+                                    // We're not going to break websites for people just because the
+                                    // designated CRL is offline.
                                     ++acceptable;
                                 }
                                 break;
                         }
                     }
 
-                    // If, and ONLY IF, all of our existing errors are acceptable, we will adjust the chain
-                    // verification to tolerate those errors and re-run the chain building process.
+                    // If, and ONLY IF, all of our existing errors are acceptable, we will adjust the
+                    // chain verification to tolerate those errors and re-run the chain building process.
                     if (acceptable > 0 && acceptable == chain.ChainStatus.Length)
                     {
                         chain.ChainPolicy.VerificationFlags = X509VerificationFlags.IgnoreCertificateAuthorityRevocationUnknown | X509VerificationFlags.IgnoreCtlSignerRevocationUnknown | X509VerificationFlags.IgnoreEndRevocationUnknown | X509VerificationFlags.IgnoreRootRevocationUnknown;
@@ -300,7 +300,7 @@ namespace CitadelCore.Net.Proxy
         }
 
         /// <summary>
-        /// Creates a web server that will bind to local addresses to any available port. 
+        /// Creates a web server that will bind to local addresses to any available port.
         /// </summary>
         /// <param name="isV6">
         /// Whether or not this server should be bound to a v6 address. We have yet to determine if
@@ -309,7 +309,7 @@ namespace CitadelCore.Net.Proxy
         /// two hosts.
         /// </param>
         /// <returns>
-        /// An IWebHost that will transparently proxy all requests. 
+        /// An IWebHost that will transparently proxy all requests.
         /// </returns>
         /// <exception cref="NullReferenceException">
         /// In the event that the internal kestrel engine doesn't properly initialize, this method
@@ -347,7 +347,8 @@ namespace CitadelCore.Net.Proxy
                     listenOpts.NoDelay = true;
 
                     // HTTP 2 got cut last minute from 2.1 and MS speculates that it may take several
-                    // releases to get it properly included. https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456                    
+                    // releases to get it properly included.
+                    // https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456
                     // listenOpts.Protocols = HttpProtocols.Http1;
 
                     httpsListenOptions = listenOpts;
@@ -361,7 +362,8 @@ namespace CitadelCore.Net.Proxy
                     listenOpts.NoDelay = true;
 
                     // HTTP 2 got cut last minute from 2.1 and MS speculates that it may take several
-                    // releases to get it properly included. https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456
+                    // releases to get it properly included.
+                    // https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456
                     // listenOpts.Protocols = HttpProtocols.Http1;
 
                     httpListenOptions = listenOpts;
@@ -370,12 +372,12 @@ namespace CitadelCore.Net.Proxy
 
             // Add compression for responses.
             ipWebhostBuilder.ConfigureServices(serviceOpts =>
-            {   
+            {
                 serviceOpts.AddResponseCompression();
             });
 
             ipWebhostBuilder.Configure(cfgApp =>
-            {   
+            {
                 cfgApp.UseResponseCompression();
             });
 
@@ -391,7 +393,7 @@ namespace CitadelCore.Net.Proxy
             vHost.Start();
 
             // Since this is post vHost.Start(), we can now grab the EP of the connection.
-            if(httpListenOptions != null)
+            if (httpListenOptions != null)
             {
                 if (isV6)
                 {

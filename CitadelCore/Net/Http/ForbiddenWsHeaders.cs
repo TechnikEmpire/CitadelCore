@@ -7,38 +7,34 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace CitadelCore.Net.Http
 {
     internal static class ForbiddenWsHeaders
     {
-        // More headers specific to websockets here:
-        // https://tools.ietf.org/html/rfc6455#section-11.3
+        // More headers specific to websockets here: https://tools.ietf.org/html/rfc6455#section-11.3
 
         /// <summary>
-        /// List of headers that cause headaches for proxies like me. 
+        /// List of headers that cause headaches for proxies like me.
         /// </summary>
         private static readonly HashSet<string> s_forbidden = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            // Inherit QUIC/Google custom compression stuff, prevent
-            // pinning related headers etc. All imported from
-            // ForbiddenHttpHeaders.
+            // Inherit QUIC/Google custom compression stuff, prevent pinning related headers etc. All
+            // imported from ForbiddenHttpHeaders.
             "X-SDHC",
             "Avail-Dictionary",
             "Public-Key-Pins",
             "Public-Key-Pins-Report-Only",
 
-            // Our client websocket might not be the same as our server websocket. In 
-            // .NET Standard 2.0 for example, the Kestrel client websocket is a completely
-            // different class than the ClientWebSocket class.
+            // Our client websocket might not be the same as our server websocket. In .NET Standard
+            // 2.0 for example, the Kestrel client websocket is a completely different class than the
+            // ClientWebSocket class.
             "Sec-WebSocket-Extensions",
 
             // We don't want to pass negotiation stuff upstream.
             "Sec-WebSocket-Key",
 
-            // Don't set the version for our client socket. Microsoft sets
-            // this all by themselves.
+            // Don't set the version for our client socket. Microsoft sets this all by themselves.
             "Sec-WebSocket-Version",
 
             // We manually add cookies so we don't want them this way.
@@ -46,17 +42,17 @@ namespace CitadelCore.Net.Http
         };
 
         /// <summary>
-        /// Whether or not the given header name is a forbidden header. 
+        /// Whether or not the given header name is a forbidden header.
         /// </summary>
         /// <param name="headerName">
-        /// The header name. 
+        /// The header name.
         /// </param>
         /// <returns>
-        /// True if the header named is forbidden, false otherwise. 
+        /// True if the header named is forbidden, false otherwise.
         /// </returns>
         public static bool IsForbidden(string headerName)
         {
-            if(headerName == null)
+            if (headerName == null)
             {
                 return true;
             }

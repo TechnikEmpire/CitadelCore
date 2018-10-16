@@ -104,7 +104,8 @@ namespace CitadelCore.Net.Handlers
         /// The HTTP context.
         /// </param>
         /// <returns>
-        /// Destroys the whole universe. This handler is not implemented so it throws an exception. Not used.
+        /// Destroys the whole universe. This handler is not implemented so it throws an exception.
+        /// Not used.
         /// </returns>
         private AbstractFilterResponseHandler HandleUnknownProtocol(HttpContext context)
         {

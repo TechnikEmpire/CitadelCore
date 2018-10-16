@@ -18,7 +18,7 @@ namespace CitadelCore.Extensions
     internal static class CertificateExtensions
     {
         /// <summary>
-        /// Converts a V1 X509Certificate to a V2 certificate. 
+        /// Converts a V1 X509Certificate to a V2 certificate.
         /// </summary>
         /// <param name="cert">
         /// </param>
@@ -26,7 +26,7 @@ namespace CitadelCore.Extensions
         /// </returns>
         public static X509Certificate2 ToV2Certificate(this X509Certificate cert)
         {
-            if(cert is X509Certificate2 cast)
+            if (cert is X509Certificate2 cast)
             {
                 return cast;
             }
@@ -58,7 +58,7 @@ namespace CitadelCore.Extensions
             const string password = "password";
             byte[] certBytes = null;
 
-            using(var ms = new MemoryStream())
+            using (var ms = new MemoryStream())
             {
                 store.Save(ms, password.ToCharArray(), new Org.BouncyCastle.Security.SecureRandom());
                 certBytes = ms.ToArray();

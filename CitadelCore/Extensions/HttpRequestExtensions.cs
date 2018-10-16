@@ -84,10 +84,10 @@ namespace CitadelCore.Extensions
                     var failedHeaders = message.PopulateHeaders(messageInfo.Headers);
 
 #if VERBOSE_WARNINGS
-                        foreach (string key in failedHeaders)
-                        {
-                            LoggerProxy.Default.Warn(string.Format("Failed to add HTTP header with key {0} and with value {1}.", key, failedHeaders[key]));
-                        }
+                    foreach (string key in failedHeaders)
+                    {
+                        LoggerProxy.Default.Warn(string.Format("Failed to add HTTP header with key {0} and with value {1}.", key, failedHeaders[key]));
+                    }
 #endif
 
                     message.Method = messageInfo.Method.Method;

@@ -14,7 +14,7 @@ namespace CitadelCore.Net.Proxy
     public enum ProxyNextAction
     {
         /// <summary>
-        /// Lets the connection pass through without filtering at its current state. 
+        /// Lets the connection pass through without filtering at its current state.
         /// </summary>
         AllowAndIgnoreContent = 0,
 
@@ -45,7 +45,7 @@ namespace CitadelCore.Net.Proxy
         DropConnection = 3,
 
         /// <summary>
-        /// Allows the entire connection, including any response, to pass without any inspection or filtering. 
+        /// Allows the entire connection, including any response, to pass without any inspection or filtering.
         /// </summary>
         AllowAndIgnoreContentAndResponse = 4
     }

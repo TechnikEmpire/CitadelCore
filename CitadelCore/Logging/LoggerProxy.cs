@@ -12,9 +12,8 @@ using System.Text;
 
 namespace CitadelCore.Logging
 {
-
     /// <summary>
-    /// Delegate for receiving messages from the logger proxy. 
+    /// Delegate for receiving messages from the logger proxy.
     /// </summary>
     /// <param name="msg">
     /// The message to log.
@@ -44,12 +43,12 @@ namespace CitadelCore.Logging
         public event MessageHandler OnWarning;
 
         /// <summary>
-        /// Error handler. This handler will receive error messages about internal proxy state and actions. 
+        /// Error handler. This handler will receive error messages about internal proxy state and actions.
         /// </summary>
         public event MessageHandler OnError;
 
         /// <summary>
-        /// Singleton because getting fancy here is just showing off and a waste of time. 
+        /// Singleton because getting fancy here is just showing off and a waste of time.
         /// </summary>
         public static LoggerProxy Default
         {
@@ -61,17 +60,16 @@ namespace CitadelCore.Logging
 
         private LoggerProxy()
         {
-
         }
 
         /// <summary>
-        /// Logging proxy interface for informational messages. 
+        /// Logging proxy interface for informational messages.
         /// </summary>
         /// <param name="msg">
-        /// The message. 
+        /// The message.
         /// </param>
         /// <param name="callerName">
-        /// Courtesy of compiler services, the name of the function from which this method was invoked. 
+        /// Courtesy of compiler services, the name of the function from which this method was invoked.
         /// </param>
         /// <param name="callerFilePath">
         /// Courtesy of compiler services, the source file containing the function from which this
@@ -93,19 +91,21 @@ namespace CitadelCore.Logging
         }
 
         /// <summary>
-        /// Logging proxy interface for warning messages. 
+        /// Logging proxy interface for warning messages.
         /// </summary>
         /// <param name="msg">
-        /// The message. 
+        /// The message.
         /// </param>
         /// <param name="callerName">
         /// Courtesy of compiler services, the name of the function from which this method was invoked.
         /// </param>
         /// <param name="callerFilePath">
-        /// Courtesy of compiler services, the source file containing the function from which this method was invoked.
+        /// Courtesy of compiler services, the source file containing the function from which this
+        /// method was invoked.
         /// </param>
         /// <param name="callerSourceLineNumber">
-        /// Courtesy of compiler services, the line number in the source file from which this method was invoked.
+        /// Courtesy of compiler services, the line number in the source file from which this method
+        /// was invoked.
         /// </param>
         /// <remarks>
         /// Though this is a public function, this is designed to be used by plugins or other such
@@ -119,19 +119,21 @@ namespace CitadelCore.Logging
         }
 
         /// <summary>
-        /// Logging proxy interface for error messages. 
+        /// Logging proxy interface for error messages.
         /// </summary>
         /// <param name="msg">
-        /// The message. 
+        /// The message.
         /// </param>
         /// <param name="callerName">
         /// Courtesy of compiler services, the name of the function from which this method was invoked.
         /// </param>
         /// <param name="callerFilePath">
-        /// Courtesy of compiler services, the source file containing the function from which this method was invoked.
+        /// Courtesy of compiler services, the source file containing the function from which this
+        /// method was invoked.
         /// </param>
         /// <param name="callerSourceLineNumber">
-        /// Courtesy of compiler services, the line number in the source file from which this method was invoked.
+        /// Courtesy of compiler services, the line number in the source file from which this method
+        /// was invoked.
         /// </param>
         /// <remarks>
         /// Though this is a public function, this is designed to be used by plugins or other such
@@ -149,10 +151,10 @@ namespace CitadelCore.Logging
         /// stacktrace to a string, before piping that final string to listeners.
         /// </summary>
         /// <param name="e">
-        /// The exception. 
+        /// The exception.
         /// </param>
         /// <param name="callerName">
-        /// Courtesy of compiler services, the name of the function from which this method was invoked. 
+        /// Courtesy of compiler services, the name of the function from which this method was invoked.
         /// </param>
         /// <param name="callerFilePath">
         /// Courtesy of compiler services, the source file containing the function from which this
@@ -170,7 +172,7 @@ namespace CitadelCore.Logging
         public void Error(Exception e, [CallerMemberName] string callerName = "", [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerSourceLineNumber = 0)
         {
             var b = new StringBuilder();
-            while(e != null)
+            while (e != null)
             {
                 b.Append(e.Message);
                 b.Append(e.StackTrace);
@@ -178,7 +180,7 @@ namespace CitadelCore.Logging
             }
 
             b.AppendFormat("\n\t From {1}::{0}() #{2}", callerName, Path.GetFileName(callerFilePath), callerSourceLineNumber);
-            
+
             OnError?.Invoke(b.ToString());
         }
     }

@@ -13,7 +13,7 @@ namespace CitadelCore.Net.Http
     internal static class ForbiddenHttpHeaders
     {
         /// <summary>
-        /// List of headers that cause headaches for proxies like me. 
+        /// List of headers that cause headaches for proxies like me.
         /// </summary>
         private static readonly HashSet<string> s_forbidden = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -31,17 +31,17 @@ namespace CitadelCore.Net.Http
         };
 
         /// <summary>
-        /// Whether or not the given header name is a forbidden header. 
+        /// Whether or not the given header name is a forbidden header.
         /// </summary>
         /// <param name="headerName">
-        /// The header name. 
+        /// The header name.
         /// </param>
         /// <returns>
-        /// True if the header named is forbidden, false otherwise. 
+        /// True if the header named is forbidden, false otherwise.
         /// </returns>
         public static bool IsForbidden(string headerName)
         {
-            if(headerName == null)
+            if (headerName == null)
             {
                 return true;
             }
