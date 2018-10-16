@@ -30,10 +30,11 @@ namespace CitadelCore.Net.Http
     public class HttpMessageInfo
     {
         /// <summary>
-        /// Used to increment the <seealso cref="MessageId"/> property.
+        /// Used to increment the <seealso cref="MessageId" /> property.
         /// </summary>
         /// <remarks>
-        /// Since this is unsigned, overflow will cause us to roll over to 0.
+        /// Interlocked.Increment will roll over the value, and then our cast to uint will ensure
+        /// that we have an infinitely recycleable unique ID.
         /// </remarks>
         private static long s_messageIdGen = 0;
 
