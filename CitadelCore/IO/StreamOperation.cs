@@ -20,6 +20,11 @@ namespace CitadelCore.IO
         /// <summary>
         /// The stream was written to.
         /// </summary>
-        Write
+        Write,
+
+        /// <summary>
+        /// The stream was closed.
+        /// </summary>
+        Close
     }
 }

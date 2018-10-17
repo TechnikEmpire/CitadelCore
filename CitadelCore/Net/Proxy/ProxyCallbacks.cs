@@ -56,4 +56,42 @@ namespace CitadelCore.Net.Proxy
     /// The message information object.
     /// </param>
     public delegate void HttpMessageWholeBodyInspectionHandler(HttpMessageInfo messageInfo);
+
+    /// <summary>
+    /// Delegate for invoking a a command to terminate a replay inspection.
+    /// </summary>
+    /// <param name="closeSourceStream">
+    /// Whether or not to close the source stream when terminating the replay.
+    /// </param>
+    /// <remarks>
+    /// A replay can be terminated without closing the source stream. When terminating and indicating
+    /// that the source stream should NOT be closed, we're simply stopping the duplication of the
+    /// source stream data. When terminating and indicating that the source stream SHOULD be closed,
+    /// then the original stream and the replay stream will be immediately terminated.
+    /// </remarks>
+    public delegate void HttpReplayTerminationCallback(bool closeSourceStream);
+
+    /// <summary>
+    /// Delegate for receiving a response to a replay inspection request.
+    /// </summary>
+    /// <param name="replayUrl">
+    /// The replay URL to connect to in order to receive an exact replay of the source data HTTP
+    /// response. Note that presently, only HTTP responses are supported.
+    /// </param>
+    /// <param name="cancellationCallback">
+    /// A provided delegate that can be used to immediately terminate the replay, and optionally the
+    /// source stream.
+    /// </param>
+    /// <remarks>
+    /// This delegate is to be used for exceptional inspection that requires third party processes or
+    /// to read the full HTTP response from a real HTTP server directly.
+    ///
+    /// Note that presently, only HTTP responses are supported. This is mostly due to the fact that
+    /// responses are where the "good stuff" is usually happening, and also that there may be issues
+    /// with Kestrel already scooping up and processing the request payload before invoking the
+    /// handler, which negates the purpose of this kind of inspection.
+    ///
+    /// For more information, see the remarks on <seealso cref="ProxyNextAction.AllowButRequestResponseReplay" />.
+    /// </remarks>
+    public delegate void HttpMessageReplayInspectionHandler(string replayUrl, HttpReplayTerminationCallback cancellationCallback);
 }

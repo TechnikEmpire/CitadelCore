@@ -32,6 +32,11 @@ namespace CitadelCore.Net.Handlers
         protected HttpMessageStreamedInspectionHandler _streamInpsectionCb;
 
         /// <summary>
+        /// Callback used when replay content inspection is request on a HTTP response.
+        /// </summary>
+        protected HttpMessageReplayInspectionHandler _replayInspectionCb;
+
+        /// <summary>
         /// For writing empty responses without new allocations.
         /// </summary>
         protected static readonly byte[] s_nullBody = new byte[0];
@@ -48,11 +53,19 @@ namespace CitadelCore.Net.Handlers
         /// <param name="streamInspectionCallback">
         /// Callback used when streamed content inspection is requested on a new message.
         /// </param>
-        public AbstractFilterResponseHandler(NewHttpMessageHandler newMessageCallback, HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback, HttpMessageStreamedInspectionHandler streamInspectionCallback)
+        /// <param name="replayInspectionCallback">
+        /// Callback used when replay content inspection is requested on HTTP response message.
+        /// </param>
+        public AbstractFilterResponseHandler(
+            NewHttpMessageHandler newMessageCallback,
+            HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback,
+            HttpMessageStreamedInspectionHandler streamInspectionCallback,
+            HttpMessageReplayInspectionHandler replayInspectionCallback)
         {
             _newMessageCb = newMessageCallback;
             _wholeBodyInspectionCb = wholeBodyInspectionCallback;
             _streamInpsectionCb = streamInspectionCallback;
+            _replayInspectionCb = replayInspectionCallback;
         }
 
         /// <summary>

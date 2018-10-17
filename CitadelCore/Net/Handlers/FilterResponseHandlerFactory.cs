@@ -24,6 +24,13 @@ namespace CitadelCore.Net.Handlers
         } = new FilterResponseHandlerFactory();
 
         /// <summary>
+        /// Private constructor to enforce singleton.
+        /// </summary>
+        private FilterResponseHandlerFactory()
+        {
+        }
+
+        /// <summary>
         /// The new message callback, supplied to newly created handlers.
         /// </summary>
         public NewHttpMessageHandler NewMessageCallback
@@ -33,7 +40,7 @@ namespace CitadelCore.Net.Handlers
         }
 
         /// <summary>
-        /// The whole-bod content inspection callback, supplied to newly created handlers.
+        /// The whole-body content inspection callback, supplied to newly created handlers.
         /// </summary>
         public HttpMessageWholeBodyInspectionHandler WholeBodyInspectionCallback
         {
@@ -42,9 +49,18 @@ namespace CitadelCore.Net.Handlers
         }
 
         /// <summary>
-        /// The whole-bod content inspection callback, supplied to newly created handlers.
+        /// The streamed content inspection callback, supplied to newly created handlers.
         /// </summary>
         public HttpMessageStreamedInspectionHandler StreamedInspectionCallback
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// The replay content inspection callback, supplied to newly created handlers.
+        /// </summary>
+        public HttpMessageReplayInspectionHandler ReplayInspectionCallback
         {
             get;
             set;
@@ -80,7 +96,7 @@ namespace CitadelCore.Net.Handlers
         /// </returns>
         private AbstractFilterResponseHandler HandleWebsocket(HttpContext context)
         {
-            return new FilterWebsocketHandler(NewMessageCallback, WholeBodyInspectionCallback, StreamedInspectionCallback);
+            return new FilterWebsocketHandler(NewMessageCallback, WholeBodyInspectionCallback, StreamedInspectionCallback, ReplayInspectionCallback);
         }
 
         /// <summary>
@@ -94,11 +110,11 @@ namespace CitadelCore.Net.Handlers
         /// </returns>
         private AbstractFilterResponseHandler HandleHttp(HttpContext context)
         {
-            return new FilterHttpResponseHandler(NewMessageCallback, WholeBodyInspectionCallback, StreamedInspectionCallback);
+            return new FilterHttpResponseHandler(NewMessageCallback, WholeBodyInspectionCallback, StreamedInspectionCallback, ReplayInspectionCallback);
         }
 
         /// <summary>
-        /// Constructs a new handler specially for websocket contexts.
+        /// Constructs a new handler specially for unknown protocol contexts.
         /// </summary>
         /// <param name="context">
         /// The HTTP context.
@@ -109,7 +125,7 @@ namespace CitadelCore.Net.Handlers
         /// </returns>
         private AbstractFilterResponseHandler HandleUnknownProtocol(HttpContext context)
         {
-            return new FilterPassthroughResponseHandler(NewMessageCallback, WholeBodyInspectionCallback, StreamedInspectionCallback);
+            return new FilterPassthroughResponseHandler(NewMessageCallback, WholeBodyInspectionCallback, StreamedInspectionCallback, ReplayInspectionCallback);
         }
     }
 }

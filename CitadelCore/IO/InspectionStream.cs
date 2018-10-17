@@ -8,8 +8,6 @@
 using CitadelCore.Net.Http;
 using System;
 using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace CitadelCore.IO
 {
@@ -28,6 +26,11 @@ namespace CitadelCore.IO
         /// Called whenever data is written to the stream.
         /// </summary>
         internal StreamIOHandler StreamWrite;
+
+        /// <summary>
+        /// Called whenever the stream is closed.
+        /// </summary>
+        internal StreamIOHandler StreamClosed;
 
         /// <summary>
         /// Indicates whether the stream supports reading.
@@ -206,59 +209,12 @@ namespace CitadelCore.IO
         }
 
         /// <summary>
-        /// Reads a sequence of bytes from the stream asynchronously.
+        /// Invokes the <seealso cref="StreamClosed" /> callback.
         /// </summary>
-        /// <param name="buffer">
-        /// The buffer to read in to.
-        /// </param>
-        /// <param name="offset">
-        /// The offset within the buffer to read in to.
-        /// </param>
-        /// <param name="count">
-        /// The maximum number of bytes to read.
-        /// </param>
-        /// <param name="cancellationToken">
-        /// The async write cancellation token.
-        /// </param>
-        /// <returns>
-        /// The number of bytes read from the stream.
-        /// </returns>
-        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        public override void Close()
         {
-            var numRead = await base.ReadAsync(buffer, offset, count, cancellationToken);
-
-            StreamRead?.Invoke(this, new Memory<byte>(buffer, offset, numRead), out _dropConnection);
-
-            CheckHandleDropFlag();
-
-            return numRead;
-        }
-
-        /// <summary>
-        /// Writes a sequence of bytes to the stream asynchronously.
-        /// </summary>
-        /// <param name="buffer">
-        /// The buffer to write.
-        /// </param>
-        /// <param name="offset">
-        /// The offset within the buffer to write in to the stream.
-        /// </param>
-        /// <param name="count">
-        /// The maximum number of bytes to write.
-        /// </param>
-        /// <param name="cancellationToken">
-        /// The async write cancellation token.
-        /// </param>
-        /// <returns>
-        /// The number of bytes written in to the stream.
-        /// </returns>
-        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-        {
-            StreamWrite?.Invoke(this, new Memory<byte>(buffer, offset, count), out _dropConnection);
-
-            CheckHandleDropFlag();
-
-            return base.WriteAsync(buffer, offset, count, cancellationToken);
+            StreamClosed?.Invoke(this, new Memory<byte>(), out _dropConnection);
+            base.Close();
         }
 
         /// <summary>

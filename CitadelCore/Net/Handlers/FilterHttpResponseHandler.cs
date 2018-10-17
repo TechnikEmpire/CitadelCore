@@ -8,6 +8,7 @@
 using CitadelCore.Extensions;
 using CitadelCore.IO;
 using CitadelCore.Logging;
+using CitadelCore.Net.Handlers.Replay;
 using CitadelCore.Net.Http;
 using CitadelCore.Net.Proxy;
 using Microsoft.AspNetCore.Http;
@@ -79,7 +80,15 @@ namespace CitadelCore.Net.Handlers
         /// <param name="streamInspectionCallback">
         /// Callback used when streamed content inspection is requested on a new message.
         /// </param>
-        public FilterHttpResponseHandler(NewHttpMessageHandler newMessageCallback, HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback, HttpMessageStreamedInspectionHandler streamInspectionCallback) : base(newMessageCallback, wholeBodyInspectionCallback, streamInspectionCallback)
+        /// <param name="replayInspectionCallback">
+        /// Callback used when replay content inspection is requested on HTTP response message.
+        /// </param>
+        public FilterHttpResponseHandler(
+            NewHttpMessageHandler newMessageCallback,
+            HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback,
+            HttpMessageStreamedInspectionHandler streamInspectionCallback,
+            HttpMessageReplayInspectionHandler replayInspectionCallback
+            ) : base(newMessageCallback, wholeBodyInspectionCallback, streamInspectionCallback, replayInspectionCallback)
         {
         }
 
@@ -200,9 +209,9 @@ namespace CitadelCore.Net.Handlers
                                         requestMessageNfo = new HttpMessageInfo
                                         {
                                             Url = reqUrl,
-                                            // We recycle the very first unique message ID (auto generated) in order
-                                            // to enable the library user to track this single connection across
-                                            // multiple callbacks.
+                                            // We recycle the very first unique message ID (auto
+                                            // generated) in order to enable the library user to
+                                            // track this single connection across multiple callbacks.
                                             MessageId = requestMessageNfo.MessageId,
                                             Method = new HttpMethod(context.Request.Method),
                                             IsEncrypted = context.Request.IsHttps,
@@ -277,7 +286,8 @@ namespace CitadelCore.Net.Handlers
                                 var wrappedStream = new InspectionStream(requestMessageNfo, context.Request.Body)
                                 {
                                     StreamRead = OnWrappedStreamRead,
-                                    StreamWrite = OnWrappedStreamWrite
+                                    StreamWrite = OnWrappedStreamWrite,
+                                    StreamClosed = OnWrappedStreamClose
                                 };
 
                                 requestMsg.Content = new StreamContent(wrappedStream);
@@ -402,7 +412,7 @@ namespace CitadelCore.Net.Handlers
                         {
                             case ProxyNextAction.AllowButRequestContentInspection:
                                 {
-                                    using (var upstreamResponseStream = await response.Content.ReadAsStreamAsync())
+                                    using (var upstreamResponseStream = await response?.Content.ReadAsStreamAsync())
                                     {
                                         using (var ms = new MemoryStream())
                                         {
@@ -491,16 +501,80 @@ namespace CitadelCore.Net.Handlers
                                         RemoteAddress = context.Connection.RemoteIpAddress,
                                         RemotePort = (ushort)context.Connection.RemotePort,
                                         LocalAddress = context.Connection.LocalIpAddress,
-                                        LocalPort = (ushort)context.Connection.LocalPort
+                                        LocalPort = (ushort)context.Connection.LocalPort,
+                                        BodyInternal = new Memory<byte>()
                                     };
 
-                                    using (var responseStream = await response.Content.ReadAsStreamAsync())
+                                    using (var responseStream = await response?.Content.ReadAsStreamAsync())
                                     {
                                         // We have a body and the user wants to just stream-inspect it.
                                         using (var wrappedStream = new InspectionStream(responseMessageNfo, responseStream))
                                         {
                                             wrappedStream.StreamRead = OnWrappedStreamRead;
                                             wrappedStream.StreamWrite = OnWrappedStreamWrite;
+                                            wrappedStream.StreamClosed = OnWrappedStreamClose;
+
+                                            await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(wrappedStream, context.Response.Body, null, context.RequestAborted);
+                                        }
+                                    }
+
+                                    return;
+                                }
+
+                            case ProxyNextAction.AllowButRequestResponseReplay:
+                                {
+                                    responseMessageNfo = new HttpMessageInfo
+                                    {
+                                        Url = reqUrl,
+                                        MessageId = requestMessageNfo.MessageId,
+                                        IsEncrypted = context.Request.IsHttps,
+                                        Headers = response.ExportAllHeaders(),
+                                        MessageProtocol = MessageProtocol.Http,
+                                        StatusCode = response.StatusCode,
+                                        HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
+                                        MessageType = MessageType.Response,
+                                        RemoteAddress = context.Connection.RemoteIpAddress,
+                                        RemotePort = (ushort)context.Connection.RemotePort,
+                                        LocalAddress = context.Connection.LocalIpAddress,
+                                        LocalPort = (ushort)context.Connection.LocalPort
+                                    };
+
+                                    using (var responseStream = await response?.Content.ReadAsStreamAsync())
+                                    {
+                                        var replay = ReplayResponseHandlerFactory.Default.CreateReplay(responseMessageNfo, context.RequestAborted);
+
+                                        // Lambda for handling this specific replay object.
+                                        HttpReplayTerminationCallback cancellationFunction = (bool closeSourceStream) =>
+                                        {
+                                            replay.ReplayAborted = true;
+
+                                            if (closeSourceStream)
+                                            {
+                                                // Close down the source stream if requested.
+                                                context.Abort();
+                                            }
+                                        };
+
+                                        // We have a body and the user wants to just stream-inspect it.
+                                        using (var wrappedStream = new InspectionStream(responseMessageNfo, responseStream))
+                                        {
+                                            wrappedStream.StreamRead = (InspectionStream stream, Memory<byte> buffer, out bool dropConnection) =>
+                                            {
+                                                dropConnection = false;
+
+                                                if (buffer.Length > 0)
+                                                {
+                                                    replay.WriteBodyBytes(buffer);
+                                                }
+                                            };
+
+                                            wrappedStream.StreamClosed = (InspectionStream stream, Memory<byte> buffer, out bool dropConnection) =>
+                                            {
+                                                dropConnection = false;
+                                                replay.BodyComplete = true;
+                                            };
+
+                                            _replayInspectionCb?.Invoke(replay.ReplayUrl, cancellationFunction);
 
                                             await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(wrappedStream, context.Response.Body, null, context.RequestAborted);
                                         }
@@ -513,7 +587,7 @@ namespace CitadelCore.Net.Handlers
 
                     // If we made it here, then the user just wants to let the response be streamed
                     // in without any inspection etc, so do exactly that.
-                    using (var responseStream = await response.Content.ReadAsStreamAsync())
+                    using (var responseStream = await response?.Content.ReadAsStreamAsync())
                     {
                         context.Response.StatusCode = (int)response.StatusCode;
                         context.Response.PopulateHeaders(response.ExportAllHeaders());
@@ -617,6 +691,24 @@ namespace CitadelCore.Net.Handlers
         {
             dropConnection = false;
             _streamInpsectionCb?.Invoke(stream.MessageInfo, StreamOperation.Write, buffer, out dropConnection);
+        }
+
+        /// <summary>
+        /// Handler for every requested InspectionStream object's close callback.
+        /// </summary>
+        /// <param name="stream">
+        /// The originating stream.
+        /// </param>
+        /// <param name="buffer">
+        /// The data passed through the stream. Empty in this case.
+        /// </param>
+        /// <param name="dropConnection">
+        /// Whether or not to immediately terminate the stream. Ignored in this case.
+        /// </param>
+        private void OnWrappedStreamClose(InspectionStream stream, Memory<byte> buffer, out bool dropConnection)
+        {
+            dropConnection = false;
+            _streamInpsectionCb?.Invoke(stream.MessageInfo, StreamOperation.Close, buffer, out dropConnection);
         }
     }
 }

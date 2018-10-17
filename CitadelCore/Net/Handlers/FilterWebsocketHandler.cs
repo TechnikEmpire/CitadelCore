@@ -5,7 +5,6 @@
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-using System.Net.WebSockets.Managed;
 using CitadelCore.Extensions;
 using CitadelCore.IO;
 using CitadelCore.Logging;
@@ -14,6 +13,7 @@ using CitadelCore.Net.Proxy;
 using Microsoft.AspNetCore.Http;
 using System;
 using System.Net.Http;
+using System.Net.WebSockets.Managed;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -42,7 +42,15 @@ namespace CitadelCore.Net.Handlers
         /// <param name="streamInspectionCallback">
         /// Callback used when streamed content inspection is requested on a new message.
         /// </param>
-        public FilterWebsocketHandler(NewHttpMessageHandler newMessageCallback, HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback, HttpMessageStreamedInspectionHandler streamInspectionCallback) : base(newMessageCallback, wholeBodyInspectionCallback, streamInspectionCallback)
+        /// <param name="replayInspectionCallback">
+        /// Callback used when replay content inspection is requested on HTTP response message.
+        /// </param>
+        public FilterWebsocketHandler(
+            NewHttpMessageHandler newMessageCallback,
+            HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback,
+            HttpMessageStreamedInspectionHandler streamInspectionCallback,
+            HttpMessageReplayInspectionHandler replayInspectionCallback
+            ) : base(newMessageCallback, wholeBodyInspectionCallback, streamInspectionCallback, replayInspectionCallback)
         {
         }
 

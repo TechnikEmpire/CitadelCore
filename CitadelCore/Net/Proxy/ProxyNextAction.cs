@@ -5,6 +5,8 @@
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+using CitadelCore.IO;
+
 namespace CitadelCore.Net.Proxy
 {
     /// <summary>
@@ -47,6 +49,40 @@ namespace CitadelCore.Net.Proxy
         /// <summary>
         /// Allows the entire connection, including any response, to pass without any inspection or filtering.
         /// </summary>
-        AllowAndIgnoreContentAndResponse = 4
+        AllowAndIgnoreContentAndResponse = 4,
+
+        /// <summary>
+        /// Allows the connection to proceed, but in the appropriate callback, a localhost URL is
+        /// given where the connection payload can be read from a local HTTP server and replayed
+        /// exactly as it was received by the proxy. Along with a unique URL where a replay can be
+        /// requested from, a callback is also supplied that enables the user to terminate the
+        /// connection at any time.
+        /// </summary>
+        /// <remarks>
+        /// What is this all about? What good reason can we possibly have for simply duplicating data
+        /// in memory and piping it through another, second HTTP request and response? Simple. Some
+        /// data may require more complex analysis that must involve a secondary processing mechanism.
+        ///
+        /// A perfect example of such a scenario is video playback, which also happens to be the
+        /// primary motivator behind the addition of this capability. We already have the
+        /// <seealso cref="InspectionStream" /> class, but trying to program something atop the
+        /// <seealso cref="InspectionStream" /> to reconstruct all the various types of video that
+        /// can be piped over TCP, and all the various protocols that can be used to transfer it, is
+        /// a ludicrous proposition. It's simply an astronomical undertaking that I can't imagine
+        /// succeeding, if working properly even most of the time is the definition of success here.
+        ///
+        /// So, by "replaying" the response, we can feed the returned URL to an external mechamism,
+        /// like Windows Media Foundation, which will leverage it's own monolithic code to make the
+        /// connection, determine the media type, load the codec (and pay the patent fees), manage
+        /// the data stream and connection, leverage the GPU to decode things, and very nicely just
+        /// hand us video and audio frames on request.
+        ///
+        /// This is the purpose of the response replay mechanism. In fact "replay" is only used here
+        /// because of naming precendents in this field (think HTTP replay, packet replay). What's
+        /// actually happening is that, assuming you connect to the given URL immediately, you are
+        /// receiving a real-time duplication of the data, and as such can also terminate the stream
+        /// before full completion if your inspection of the replay causes you to make this determination.
+        /// </remarks>
+        AllowButRequestResponseReplay = 5
     }
 }

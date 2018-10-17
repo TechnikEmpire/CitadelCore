@@ -26,7 +26,15 @@ namespace CitadelCore.Net.Handlers
         /// <param name="streamInspectionCallback">
         /// Callback used when streamed content inspection is requested on a new message.
         /// </param>
-        public FilterPassthroughResponseHandler(NewHttpMessageHandler newMessageCallback, HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback, HttpMessageStreamedInspectionHandler streamInspectionCallback) : base(newMessageCallback, wholeBodyInspectionCallback, streamInspectionCallback)
+        /// <param name="replayInspectionCallback">
+        /// Callback used when replay content inspection is requested on HTTP response message.
+        /// </param>
+        public FilterPassthroughResponseHandler(
+            NewHttpMessageHandler newMessageCallback,
+            HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback,
+            HttpMessageStreamedInspectionHandler streamInspectionCallback,
+            HttpMessageReplayInspectionHandler replayInspectionCallback
+            ) : base(newMessageCallback, wholeBodyInspectionCallback, streamInspectionCallback, replayInspectionCallback)
         {
             throw new NotImplementedException();
         }

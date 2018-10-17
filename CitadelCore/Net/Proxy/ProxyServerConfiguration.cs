@@ -61,6 +61,15 @@ namespace CitadelCore.Net.Proxy
         }
 
         /// <summary>
+        /// The callback for handling request replay content inspection.
+        /// </summary>
+        public HttpMessageReplayInspectionHandler HttpMessageReplayInspectionCallback
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
         /// Configures the proxy server to use the supplied string for the common name when issuing certificates.
         /// </summary>
         /// <param name="authorityName">

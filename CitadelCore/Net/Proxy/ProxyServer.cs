@@ -10,6 +10,7 @@ using CitadelCore.Diversion;
 using CitadelCore.Logging;
 using CitadelCore.Net.ConnectionAdapters;
 using CitadelCore.Net.Handlers;
+using CitadelCore.Net.Handlers.Replay;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
@@ -123,9 +124,11 @@ namespace CitadelCore.Net.Proxy
         {
             _tlsConnAdapter = new TlsSniConnectionAdapter(CreateCertificateStore(configuration.AuthorityName ?? "CitadelCore"));
             _fwCallback = configuration.FirewallCheckCallback ?? throw new ArgumentException("The firewall callback MUST be defined.", nameof(configuration));
+
             FilterResponseHandlerFactory.Default.NewMessageCallback = configuration.NewHttpMessageHandler ?? throw new ArgumentException("The new message callback MUST be defined.", nameof(configuration));
             FilterResponseHandlerFactory.Default.WholeBodyInspectionCallback = configuration.HttpMessageWholeBodyInspectionHandler ?? throw new ArgumentException("The whole-body content inspection callback MUST be defined.", nameof(configuration));
             FilterResponseHandlerFactory.Default.StreamedInspectionCallback = configuration.HttpMessageStreamedInspectionHandler ?? throw new ArgumentException("The streaming content inspection callback MUST be defined.", nameof(configuration));
+            FilterResponseHandlerFactory.Default.ReplayInspectionCallback = configuration.HttpMessageReplayInspectionCallback ?? throw new ArgumentException("The replay content inspection callback MUST be defined.", nameof(configuration));
 
             // Hook the cert verification callback.
             ServicePointManager.ServerCertificateValidationCallback += CertificateVerificationHandler;
@@ -168,10 +171,38 @@ namespace CitadelCore.Net.Proxy
                     return;
                 }
 
+                // Create the public, v4 proxy.
+                IPEndPoint v4HttpEndpoint = null;
+                IPEndPoint v4HttpsEndpoint = null;
+
+                var publicV4Host = CreateHost<PublicServerStartup>(false, false, out v4HttpEndpoint, out v4HttpsEndpoint);
+
+                V4HttpEndpoint = v4HttpEndpoint;
+                V4HttpsEndpoint = v4HttpsEndpoint;
+
+                // Create the public, v6 proxy.
+                IPEndPoint v6HttpEndpoint = null;
+                IPEndPoint v6HttpsEndpoint = null;
+
+                var publicV6Host = CreateHost<PublicServerStartup>(false, true, out v6HttpEndpoint, out v6HttpsEndpoint);
+
+                V6HttpEndpoint = v6HttpEndpoint;
+                V6HttpsEndpoint = v6HttpsEndpoint;
+
+                // Create the private, v4 replay proxy
+                IPEndPoint privateV4HttpEndpoint = null;
+                IPEndPoint privateV4HttpsEndpoint = null;
+
+                var privateV4Host = CreateHost<PrivateServerStartup>(true, false, out privateV4HttpEndpoint, out privateV4HttpsEndpoint);
+
+                ReplayResponseHandlerFactory.Default.V4HttpEndpoint = privateV4HttpEndpoint;
+                ReplayResponseHandlerFactory.Default.V4HttpsEndpoint = privateV4HttpsEndpoint;
+
                 _hosts = new List<IWebHost>()
                 {
-                    CreateHost(false),
-                    CreateHost(true)
+                    publicV4Host,
+                    publicV6Host,
+                    privateV4Host
                 };
 
                 _diverter = CreateDiverter(
@@ -302,11 +333,20 @@ namespace CitadelCore.Net.Proxy
         /// <summary>
         /// Creates a web server that will bind to local addresses to any available port.
         /// </summary>
+        /// <param name="isPrivate">
+        /// Whether or not the host should bind to the loopback adapter, or a public interface.
+        /// </param>
         /// <param name="isV6">
         /// Whether or not this server should be bound to a v6 address. We have yet to determine if
         /// we can even grab some internal of kestrel that will allow us to manipulate the listener
         /// socket endpoint to force it into dual mode, so we use this option instead and generate
         /// two hosts.
+        /// </param>
+        /// <param name="boundHttpEndpoint">
+        /// The endpoint that the HTTP host was bound to.
+        /// </param>
+        /// <param name="boundHttpsEndpoint">
+        /// The endpoint that the HTTPS host was bound to.
         /// </param>
         /// <returns>
         /// An IWebHost that will transparently proxy all requests.
@@ -315,7 +355,7 @@ namespace CitadelCore.Net.Proxy
         /// In the event that the internal kestrel engine doesn't properly initialize, this method
         /// will throw.
         /// </exception>
-        private IWebHost CreateHost(bool isV6)
+        private IWebHost CreateHost<T>(bool isPrivate, bool isV6, out IPEndPoint boundHttpEndpoint, out IPEndPoint boundHttpsEndpoint) where T : class
         {
             WebHostBuilder ipWebhostBuilder = new WebHostBuilder();
 
@@ -382,7 +422,7 @@ namespace CitadelCore.Net.Proxy
             });
 
             // Configures how we handle requests and errors, etc.
-            ipWebhostBuilder.UseStartup<Startup>();
+            ipWebhostBuilder.UseStartup<T>();
 
             // Build host. You needed this comment.
             var vHost = ipWebhostBuilder.Build();
@@ -395,16 +435,8 @@ namespace CitadelCore.Net.Proxy
             // Since this is post vHost.Start(), we can now grab the EP of the connection.
             if (httpListenOptions != null)
             {
-                if (isV6)
-                {
-                    V6HttpEndpoint = httpListenOptions.IPEndPoint;
-                    V6HttpsEndpoint = httpsListenOptions.IPEndPoint;
-                }
-                else
-                {
-                    V4HttpEndpoint = httpListenOptions.IPEndPoint;
-                    V4HttpsEndpoint = httpsListenOptions.IPEndPoint;
-                }
+                boundHttpEndpoint = httpListenOptions.IPEndPoint;
+                boundHttpsEndpoint = httpsListenOptions.IPEndPoint;
             }
             else
             {
@@ -415,12 +447,12 @@ namespace CitadelCore.Net.Proxy
         }
 
         /// <summary>
-        /// Startup class for IWebHosts. This configures the host for important things like how to
-        /// handle errors and how to handle requests.
+        /// Startup class for public IWebHosts. This configures the host for important things like
+        /// how to handle errors and how to handle requests.
         /// </summary>
-        private class Startup
+        private class PublicServerStartup
         {
-            public Startup(IHostingEnvironment env)
+            public PublicServerStartup(IHostingEnvironment env)
             {
             }
 
@@ -471,6 +503,76 @@ namespace CitadelCore.Net.Proxy
                     {
                         var handler = FilterResponseHandlerFactory.Default.GetHandler(context);
                         await handler.Handle(context);
+                    });
+                });
+            }
+        }
+
+        /// <summary>
+        /// Startup class for private IWebHosts. This configures the host for important things like
+        /// how to handle errors and how to handle requests.
+        /// </summary>
+        private class PrivateServerStartup
+        {
+            public PrivateServerStartup(IHostingEnvironment env)
+            {
+            }
+
+            public void Configure(IApplicationBuilder app)
+            {
+                app.UseResponseCompression();
+
+                // We proxy websockets, so enable this.
+                var wsOpts = new WebSocketOptions
+                {
+                    ReceiveBufferSize = (int)(ushort.MaxValue * 5)
+                };
+                app.UseWebSockets();
+
+                // Exception handler. Not yet sure what to do here.
+                app.UseExceptionHandler(
+                    options =>
+                    {
+                        options.Run(
+                            async context =>
+                            {
+                                try
+                                {
+                                    context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                                    context.Response.ContentType = "text/html";
+
+                                    var ex = context.Features.Get<IExceptionHandlerFeature>();
+
+                                    if (ex != null)
+                                    {
+                                        var err = $"<h1>Error: {ex.Error.Message}</h1>{ex.Error.StackTrace }";
+                                        await context.Response.WriteAsync(err).ConfigureAwait(false);
+                                    }
+                                }
+                                catch { }
+                            }
+                        );
+                    }
+                );
+
+                // Global request handler. Terminates middleware, aka this is the final handler and
+                // middleware will come before this. In the end, we simply ask our factory to give us
+                // the appropriate handler given what the context us, and then let it return a task
+                // we give back to kestrel to see through.
+                app.Run(context =>
+                {
+                    return Task.Run(async () =>
+                    {
+                        var handler = ReplayResponseHandlerFactory.Default.GetHandler(context);
+
+                        if (handler != null)
+                        {
+                            await handler.Handle(context);
+                        }
+                        else
+                        {
+                            context.Abort();
+                        }
                     });
                 });
             }
