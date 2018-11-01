@@ -70,14 +70,18 @@ namespace CitadelCore.Net.Handlers
             // this will not work.
             //
             // Of course, if the user wants to manage this, then we just use their handler.
-            customProxyConnectionHandler = customProxyConnectionHandler ?? new HttpClientHandler()
+            if (customProxyConnectionHandler == null)
             {
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
-                UseCookies = false,
-                ClientCertificateOptions = ClientCertificateOption.Automatic,
-                AllowAutoRedirect = false,
-                Proxy = null
-            };
+                customProxyConnectionHandler = new HttpClientHandler
+                {
+
+                    AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+                    UseCookies = false,
+                    ClientCertificateOptions = ClientCertificateOption.Automatic,
+                    AllowAutoRedirect = false,
+                    Proxy = null
+                };
+            }
 
             _client = new HttpClient(customProxyConnectionHandler);
         }
