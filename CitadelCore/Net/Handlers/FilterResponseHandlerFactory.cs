@@ -5,8 +5,12 @@
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+using CitadelCore.Net.Handlers.Replay;
 using CitadelCore.Net.Proxy;
 using Microsoft.AspNetCore.Http;
+using System;
+using System.Net;
+using System.Net.Http;
 
 namespace CitadelCore.Net.Handlers
 {
@@ -15,19 +19,67 @@ namespace CitadelCore.Net.Handlers
     /// </summary>
     internal class FilterResponseHandlerFactory
     {
-        /// <summary>
-        /// The default factory.
-        /// </summary>
-        public static FilterResponseHandlerFactory Default
+        static FilterResponseHandlerFactory()
         {
-            get;
-        } = new FilterResponseHandlerFactory();
+            // Enforce global use of good/strong TLS protocols.
+            ServicePointManager.SecurityProtocol = (ServicePointManager.SecurityProtocol & ~SecurityProtocolType.Ssl3) | (SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12);
+
+            // If this isn't set, we'll have a massive bottlenet on our upstream flow. The
+            // performance gains here extreme. This must be set.
+            ServicePointManager.DefaultConnectionLimit = ushort.MaxValue;
+
+            ServicePointManager.Expect100Continue = false;
+            ServicePointManager.CheckCertificateRevocationList = true;
+            ServicePointManager.ReusePort = true;
+            ServicePointManager.UseNagleAlgorithm = false;
+        }
 
         /// <summary>
-        /// Private constructor to enforce singleton.
+        /// Shared HttpClient instance.
         /// </summary>
-        private FilterResponseHandlerFactory()
+        private readonly HttpClient _client;
+
+        /// <summary>
+        /// Shared, non-owning instance of the replay factory we'll let our HTTP handlers create
+        /// replays with, if requested by the user.
+        /// </summary>
+        private readonly ReplayResponseHandlerFactory _replayFactory;
+
+        /// <summary>
+        /// Constructs a new instance.
+        /// </summary>
+        /// <param name="customProxyConnectionHandler">
+        /// A user-defined, custom handler for the HTTP client. If not defined, will be created with
+        /// built-in defaults.
+        /// </param>
+        /// <param name="replayFactory">
+        /// A shared, non-owning instance of the replay factory we'll let our HTTP handlers create
+        /// replays with, if requested by the user.
+        /// </param>
+        internal FilterResponseHandlerFactory(HttpMessageHandler customProxyConnectionHandler, ReplayResponseHandlerFactory replayFactory)
         {
+            _replayFactory = replayFactory;
+
+            if (replayFactory == null)
+            {
+                throw new ArgumentException("The replay factor must be defined.", nameof(replayFactory));
+            }
+
+            // We need UseCookies set to false here. We then need to set per-request cookies by
+            // manually adding the "Cookie" header. If we don't have UseCookies set to false here,
+            // this will not work.
+            //
+            // Of course, if the user wants to manage this, then we just use their handler.
+            customProxyConnectionHandler = customProxyConnectionHandler ?? new HttpClientHandler()
+            {
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+                UseCookies = false,
+                ClientCertificateOptions = ClientCertificateOption.Automatic,
+                AllowAutoRedirect = false,
+                Proxy = null
+            };
+
+            _client = new HttpClient(customProxyConnectionHandler);
         }
 
         /// <summary>
@@ -110,7 +162,7 @@ namespace CitadelCore.Net.Handlers
         /// </returns>
         private AbstractFilterResponseHandler HandleHttp(HttpContext context)
         {
-            return new FilterHttpResponseHandler(NewMessageCallback, WholeBodyInspectionCallback, StreamedInspectionCallback, ReplayInspectionCallback);
+            return new FilterHttpResponseHandler(_client, _replayFactory, NewMessageCallback, WholeBodyInspectionCallback, StreamedInspectionCallback, ReplayInspectionCallback);
         }
 
         /// <summary>

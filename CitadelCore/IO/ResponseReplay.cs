@@ -6,12 +6,12 @@
 */
 
 using CitadelCore.Net.Handlers;
-using CitadelCore.Net.Handlers.Replay;
 using CitadelCore.Net.Http;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading;
 
 namespace CitadelCore.IO
@@ -149,13 +149,21 @@ namespace CitadelCore.IO
         {
             get
             {
-                return $"http://localhost:{ReplayResponseHandlerFactory.Default.V4HttpEndpoint.Port}/replay/{MessageInfo.MessageId.ToString()}";
+                return $"http://localhost:{_serverHttpEndpoint.Port}/replay/{MessageInfo.MessageId.ToString()}";
             }
         }
 
         /// <summary>
+        /// The HTTP endpoint that the replay server can be reached at.
+        /// </summary>
+        private readonly IPEndPoint _serverHttpEndpoint;
+
+        /// <summary>
         /// Constructs a new ResponseReplay instance with the given parameters.
         /// </summary>
+        /// <param name="serverHttpEndpoint">
+        /// The HTTP endpoint that the replay server is bound to.
+        /// </param>
         /// <param name="messageInfo">
         /// The message info.
         /// </param>
@@ -168,7 +176,7 @@ namespace CitadelCore.IO
         /// <exception cref="ArgumentException">
         /// If the cancellation token is null, this constructor will throw.
         /// </exception>
-        public ResponseReplay(HttpMessageInfo messageInfo, CancellationToken cancellationToken)
+        public ResponseReplay(IPEndPoint serverHttpEndpoint, HttpMessageInfo messageInfo, CancellationToken cancellationToken)
         {
             if (messageInfo == null || messageInfo.MessageType != MessageType.Response)
             {
@@ -180,6 +188,7 @@ namespace CitadelCore.IO
                 throw new ArgumentException("The cancellation token object must not be null.", nameof(cancellationToken));
             }
 
+            _serverHttpEndpoint = serverHttpEndpoint ?? throw new ArgumentException("The server endpoint cannot be null.", nameof(cancellationToken));
             MessageInfo = messageInfo;
             _cancellationToken = cancellationToken;
         }
@@ -232,8 +241,7 @@ namespace CitadelCore.IO
 
             do
             {
-                byte[] buffer = null;
-                success = _pendingBody.TryDequeue(out buffer);
+                success = _pendingBody.TryDequeue(out byte[] buffer);
                 if (success)
                 {
                     retVal.Add(buffer);

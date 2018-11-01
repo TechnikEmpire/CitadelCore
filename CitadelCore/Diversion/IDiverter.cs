@@ -23,6 +23,16 @@ namespace CitadelCore.Diversion
         }
 
         /// <summary>
+        /// Gets or sets whether or not external proxies should be dropped during the packet
+        /// diversion process.
+        /// </summary>
+        bool DropExternalProxies
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
         /// Gets or sets the callback that the Diverter is to use when checking to see if an
         /// application behind a packet flow should have it's internet content pushed through the
         /// proxy. This is called FirewallAccess because this inherently gives the application

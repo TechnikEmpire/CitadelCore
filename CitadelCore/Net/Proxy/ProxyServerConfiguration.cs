@@ -5,6 +5,9 @@
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+using System.Net;
+using System.Net.Http;
+
 namespace CitadelCore.Net.Proxy
 {
     /// <summary>
@@ -23,6 +26,31 @@ namespace CitadelCore.Net.Proxy
             get;
             set;
         }
+
+        /// <summary>
+        /// Gets or sets whether or not the proxy server will drop all external proxy server
+        /// connections on the local machine.
+        /// </summary>
+        /// <remarks>
+        /// This is set once, and persists for the lifetime of the proxy server.
+        /// </remarks>
+        public bool BlockExternalProxies
+        {
+            get;
+            set;
+        } = true;
+
+        /// <summary>
+        /// An optional, custom message handler for the upstream proxy connections.
+        /// </summary>
+        /// <remarks>
+        /// You can use this to do things like proxy your proxy connections upstream, etc.
+        /// </remarks>
+        public HttpMessageHandler CustomProxyHandler
+        {
+            get;
+            set;
+        } = null;
 
         /// <summary>
         /// The firewall callback.
@@ -142,7 +170,7 @@ namespace CitadelCore.Net.Proxy
         /// The chained configuration instance.
         /// </returns>
         public ProxyServerConfiguration WithStreamedInspectionHandler(HttpMessageStreamedInspectionHandler callback)
-        {
+        {   
             this.HttpMessageStreamedInspectionHandler = callback;
             return this;
         }

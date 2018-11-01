@@ -10,6 +10,7 @@ using CitadelCore.Logging;
 using CitadelCore.Net.Http;
 using CitadelCore.Util;
 using System;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Net.Http;
 using System.Threading;
@@ -28,10 +29,13 @@ namespace CitadelCore.Extensions
         /// <param name="headers">
         /// The headers.
         /// </param>
+        /// <param name="exemptedHeaders">
+        /// List of headers that are exempt from being removed if they are "forbidden" headers.
+        /// </param>
         /// <returns>
         /// A collection of all headers that failed to be added.
         /// </returns>
-        public static NameValueCollection PopulateHeaders(this HttpResponseMessage message, NameValueCollection headers)
+        public static NameValueCollection PopulateHeaders(this HttpResponseMessage message, NameValueCollection headers, HashSet<string> exemptedHeaders)
         {
             // This will hold whatever headers we cannot successfully add here.
             var clonedCollection = new NameValueCollection(headers);
@@ -84,7 +88,7 @@ namespace CitadelCore.Extensions
             {
                 if (messageInfo.MessageType == MessageType.Request)
                 {
-                    var failedHeaders = message.PopulateHeaders(messageInfo.Headers);
+                    var failedHeaders = message.PopulateHeaders(messageInfo.Headers, messageInfo.ExemptedHeaders);
 
                     message.StatusCode = messageInfo.StatusCode;
 
@@ -92,7 +96,7 @@ namespace CitadelCore.Extensions
                     {
                         message.Content = new ByteArrayContent(messageInfo.Body.ToArray());
 
-                        failedHeaders = message.PopulateHeaders(messageInfo.Headers);
+                        failedHeaders = message.PopulateHeaders(messageInfo.Headers, messageInfo.ExemptedHeaders);
 
 #if VERBOSE_WARNINGS
                         foreach (string key in failedHeaders)

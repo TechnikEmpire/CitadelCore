@@ -10,6 +10,7 @@ using CitadelCore.Logging;
 using CitadelCore.Net.Http;
 using CitadelCore.Util;
 using System;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Net.Http;
 using System.Threading;
@@ -28,23 +29,26 @@ namespace CitadelCore.Extensions
         /// <param name="headers">
         /// The headers.
         /// </param>
+        /// <param name="exemptedHeaders">
+        /// List of headers that are exempt from being removed if they are "forbidden" headers.
+        /// </param>
         /// <returns>
         /// A collection of all headers that failed to be added.
         /// </returns>
-        public static NameValueCollection PopulateHeaders(this HttpRequestMessage message, NameValueCollection headers)
+        public static NameValueCollection PopulateHeaders(this HttpRequestMessage message, NameValueCollection headers, HashSet<string> exemptedHeaders)
         {
             // This will hold whatever headers we cannot successfully add here.
             var clonedCollection = new NameValueCollection(headers);
 
             foreach (string key in headers)
             {
-                if (ForbiddenHttpHeaders.IsForbidden(key))
+                if (!exemptedHeaders.Contains(key) && ForbiddenHttpHeaders.IsForbidden(key))
                 {
                     continue;
                 }
-
+                
                 if (message.Headers.TryAddWithoutValidation(key, headers.GetValues(key)))
-                {
+                {   
                     clonedCollection.Remove(key);
                 }
                 else
@@ -52,12 +56,15 @@ namespace CitadelCore.Extensions
                     if (message.Content != null)
                     {
                         if (message.Content.Headers.TryAddWithoutValidation(key, headers.GetValues(key)))
-                        {
+                        {   
                             clonedCollection.Remove(key);
                         }
                     }
                 }
             }
+
+            // Apparently, host won't set unless we use the typed accessor!
+            message.Headers.Host = headers["Host"] ?? message.Headers.Host;
 
             return clonedCollection;
         }
@@ -84,7 +91,7 @@ namespace CitadelCore.Extensions
             {
                 if (messageInfo.MessageType == MessageType.Request)
                 {
-                    var failedHeaders = message.PopulateHeaders(messageInfo.Headers);
+                    var failedHeaders = message.PopulateHeaders(messageInfo.Headers, messageInfo.ExemptedHeaders);
 
                     message.Method = messageInfo.Method;
                     message.RequestUri = messageInfo.Url;
@@ -93,7 +100,7 @@ namespace CitadelCore.Extensions
                     {
                         message.Content = new ByteArrayContent(messageInfo.Body.ToArray());
 
-                        failedHeaders = message.PopulateHeaders(messageInfo.Headers);
+                        failedHeaders = message.PopulateHeaders(messageInfo.Headers, messageInfo.ExemptedHeaders);
 
 #if VERBOSE_WARNINGS
                         foreach (string key in failedHeaders)

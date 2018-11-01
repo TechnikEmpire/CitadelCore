@@ -9,6 +9,7 @@ using CitadelCore.IO;
 using CitadelCore.Net.Proxy;
 using CitadelCore.Util;
 using System;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Net;
 using System.Net.Http;
@@ -241,6 +242,15 @@ namespace CitadelCore.Net.Http
             get;
             internal set;
         } = 0;
+
+        /// <summary>
+        /// A list of headers that can be populated which should be exempted from forbidden-header removal.
+        /// </summary>
+        public HashSet<string> ExemptedHeaders
+        {
+            get;
+            internal set;
+        } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Gets or sets the next action that the proxy should take for this message.

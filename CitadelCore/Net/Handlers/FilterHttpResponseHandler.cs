@@ -35,42 +35,27 @@ namespace CitadelCore.Net.Handlers
         /// </summary>
         private static readonly long s_maxInMemoryData = 128000000;
 
-        private static HttpClient s_client;
+        /// <summary>
+        /// The shared HTTP client to use in this handler.
+        /// </summary>
+        private HttpClient _client;
+
+        /// <summary>
+        /// Shared, non-owning instance of the replay factory we'll use to create replays at user-request.
+        /// </summary>
+        private readonly ReplayResponseHandlerFactory _replayFactory;
 
         private static readonly Regex s_httpVerRegex = new Regex("([0-9]+\\.[0-9]+)", RegexOptions.Compiled | RegexOptions.ECMAScript);
-
-        static FilterHttpResponseHandler()
-        {
-            // Enforce global use of good/strong TLS protocols.
-            ServicePointManager.SecurityProtocol = (ServicePointManager.SecurityProtocol & ~SecurityProtocolType.Ssl3) | (SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12);
-
-            // If this isn't set, we'll have a massive bottlenet on our upstream flow. The
-            // performance gains here extreme. This must be set.
-            ServicePointManager.DefaultConnectionLimit = ushort.MaxValue;
-
-            ServicePointManager.Expect100Continue = false;
-            ServicePointManager.CheckCertificateRevocationList = true;
-            ServicePointManager.ReusePort = true;
-            ServicePointManager.UseNagleAlgorithm = false;
-
-            // We need UseCookies set to false here. We then need to set per-request cookies by
-            // manually adding the "Cookie" header. If we don't have UseCookies set to false here,
-            // this will not work.
-            var handler = new HttpClientHandler()
-            {
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
-                UseCookies = false,
-                ClientCertificateOptions = ClientCertificateOption.Automatic,
-                AllowAutoRedirect = false,
-                Proxy = null
-            };
-
-            s_client = new HttpClient(handler);
-        }
 
         /// <summary>
         /// Constructs a FilterHttpResponseHandler instance.
         /// </summary>
+        /// <param name="client">
+        /// The HttpClient instance to use.
+        /// </param>
+        /// <param name="replayFactory">
+        /// The shared, non-owning instance of the replay factory we'll use to create replays at user-request.
+        /// </param>
         /// <param name="newMessageCallback">
         /// Callback used for new messages.
         /// </param>
@@ -84,12 +69,16 @@ namespace CitadelCore.Net.Handlers
         /// Callback used when replay content inspection is requested on HTTP response message.
         /// </param>
         public FilterHttpResponseHandler(
+            HttpClient client,
+            ReplayResponseHandlerFactory replayFactory,
             NewHttpMessageHandler newMessageCallback,
             HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback,
             HttpMessageStreamedInspectionHandler streamInspectionCallback,
             HttpMessageReplayInspectionHandler replayInspectionCallback
             ) : base(newMessageCallback, wholeBodyInspectionCallback, streamInspectionCallback, replayInspectionCallback)
         {
+            _client = client;
+            _replayFactory = replayFactory;
         }
 
         /// <summary>
@@ -104,7 +93,7 @@ namespace CitadelCore.Net.Handlers
         public override async Task Handle(HttpContext context)
         {
             HttpRequestMessage requestMsg = null;
-
+            
             try
             {
                 // Use helper to get the full, proper URL for the request. var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
@@ -176,7 +165,7 @@ namespace CitadelCore.Net.Handlers
 
                 // Create the message AFTER we give the user a chance to alter things.
                 requestMsg = new HttpRequestMessage(requestMessageNfo.Method, requestMessageNfo.Url);
-                var initialFailedHeaders = requestMsg.PopulateHeaders(requestMessageNfo.Headers);
+                var initialFailedHeaders = requestMsg.PopulateHeaders(requestMessageNfo.Headers, requestMessageNfo.ExemptedHeaders);
 
                 // Ensure that we match the protocol of the client!
                 if (upstreamReqVersionMatch != null)
@@ -241,7 +230,7 @@ namespace CitadelCore.Net.Handlers
                                         // Since the user may have modified things, we'll now
                                         // re-create the request no matter what.
                                         requestMsg = new HttpRequestMessage(requestMessageNfo.Method, requestMessageNfo.Url);
-                                        initialFailedHeaders = requestMsg.PopulateHeaders(requestMessageNfo.Headers);
+                                        initialFailedHeaders = requestMsg.PopulateHeaders(requestMessageNfo.Headers, requestMessageNfo.ExemptedHeaders);
 
                                         // Set our content, even if it's empty. Don't worry about
                                         // ByteArrayContent and friends setting other headers, we're
@@ -312,7 +301,7 @@ namespace CitadelCore.Net.Handlers
                 // because they apply to the .Content property only (content-specific headers), so
                 // once we have a .Content property created, we'll go ahead and pour over the failed
                 // headers and try to apply to them to the content.
-                initialFailedHeaders = requestMsg.PopulateHeaders(initialFailedHeaders);
+                initialFailedHeaders = requestMsg.PopulateHeaders(initialFailedHeaders, requestMessageNfo.ExemptedHeaders);
 #if VERBOSE_WARNINGS
                 foreach (string key in initialFailedHeaders)
                 {
@@ -331,7 +320,7 @@ namespace CitadelCore.Net.Handlers
                 {
                     try
                     {
-                        response = await s_client.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+                        response = await _client.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
                     }
                     catch (Exception e)
                     {
@@ -405,7 +394,7 @@ namespace CitadelCore.Net.Handlers
                         }
 
                         context.Response.ClearAllHeaders();
-                        context.Response.PopulateHeaders(responseMessageNfo.Headers);
+                        context.Response.PopulateHeaders(responseMessageNfo.Headers, responseMessageNfo.ExemptedHeaders);
                         context.Response.StatusCode = (int)response.StatusCode;
 
                         switch (responseMessageNfo.ProxyNextAction)
@@ -449,7 +438,7 @@ namespace CitadelCore.Net.Handlers
                                             }
 
                                             context.Response.ClearAllHeaders();
-                                            context.Response.PopulateHeaders(responseMessageNfo.Headers);
+                                            context.Response.PopulateHeaders(responseMessageNfo.Headers, responseMessageNfo.ExemptedHeaders);
 
                                             // User inspected but allowed the content. Just write to
                                             // the response body and then move on with your life fam.
@@ -541,7 +530,7 @@ namespace CitadelCore.Net.Handlers
 
                                     using (var responseStream = await response?.Content.ReadAsStreamAsync())
                                     {
-                                        var replay = ReplayResponseHandlerFactory.Default.CreateReplay(responseMessageNfo, context.RequestAborted);
+                                        var replay = _replayFactory.CreateReplay(responseMessageNfo, context.RequestAborted);
 
                                         // Lambda for handling this specific replay object.
                                         HttpReplayTerminationCallback cancellationFunction = (bool closeSourceStream) =>
@@ -590,7 +579,7 @@ namespace CitadelCore.Net.Handlers
                     using (var responseStream = await response?.Content.ReadAsStreamAsync())
                     {
                         context.Response.StatusCode = (int)response.StatusCode;
-                        context.Response.PopulateHeaders(response.ExportAllHeaders());
+                        context.Response.PopulateHeaders(response.ExportAllHeaders(), new System.Collections.Generic.HashSet<string>());
 
                         if (!responseHasZeroContentLength && (upstreamIsHttp1 || responseIsFixedLength))
                         {

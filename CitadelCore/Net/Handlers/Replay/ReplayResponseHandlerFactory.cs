@@ -23,14 +23,6 @@ namespace CitadelCore.Net.Handlers.Replay
     internal class ReplayResponseHandlerFactory
     {
         /// <summary>
-        /// The default factory.
-        /// </summary>
-        public static ReplayResponseHandlerFactory Default
-        {
-            get;
-        } = new ReplayResponseHandlerFactory();
-
-        /// <summary>
         /// Gets the IPV4 endpoint where HTTP replay requests can be sent to.
         /// </summary>
         public IPEndPoint V4HttpEndpoint
@@ -72,7 +64,7 @@ namespace CitadelCore.Net.Handlers.Replay
         /// <summary>
         /// Private constructor to enforce singleton.
         /// </summary>
-        private ReplayResponseHandlerFactory()
+        internal ReplayResponseHandlerFactory()
         {
             _orphanPruningWorker = new BackgroundWorker();
             _orphanPruningWorker.DoWork += OrphanPrunerWork;
@@ -136,7 +128,7 @@ namespace CitadelCore.Net.Handlers.Replay
         /// </returns>
         public ResponseReplay CreateReplay(HttpMessageInfo messageInfo, CancellationToken cancellationToken)
         {
-            var replay = new ResponseReplay(messageInfo, cancellationToken);
+            var replay = new ResponseReplay(V4HttpEndpoint, messageInfo, cancellationToken);
 
             // Fun fact I didn't know - the indexer is atomic and thread safe. So much easier than
             // AddOrUpdate w/ func!

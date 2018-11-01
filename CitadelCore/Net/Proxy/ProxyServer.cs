@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -111,6 +112,21 @@ namespace CitadelCore.Net.Proxy
         private readonly object _startStopLock = new object();
 
         /// <summary>
+        /// Persist the user's config.
+        /// </summary>
+        private ProxyServerConfiguration _configuration;
+
+        /// <summary>
+        /// The response handler factory for this specific proxy server instance.
+        /// </summary>
+        private readonly FilterResponseHandlerFactory _httpResponseFactory;
+
+        /// <summary>
+        /// The replay handler factory for this specific proxy server instance.
+        /// </summary>
+        private readonly ReplayResponseHandlerFactory _replayResponseFactory;
+
+        /// <summary>
         /// Creates a new proxy server instance. Really there should only ever be a single instance
         /// created at a time.
         /// </summary>
@@ -122,13 +138,19 @@ namespace CitadelCore.Net.Proxy
         /// </exception>
         public ProxyServer(ProxyServerConfiguration configuration)
         {
+            _configuration = configuration;
+
             _tlsConnAdapter = new TlsSniConnectionAdapter(CreateCertificateStore(configuration.AuthorityName ?? "CitadelCore"));
             _fwCallback = configuration.FirewallCheckCallback ?? throw new ArgumentException("The firewall callback MUST be defined.", nameof(configuration));
 
-            FilterResponseHandlerFactory.Default.NewMessageCallback = configuration.NewHttpMessageHandler ?? throw new ArgumentException("The new message callback MUST be defined.", nameof(configuration));
-            FilterResponseHandlerFactory.Default.WholeBodyInspectionCallback = configuration.HttpMessageWholeBodyInspectionHandler ?? throw new ArgumentException("The whole-body content inspection callback MUST be defined.", nameof(configuration));
-            FilterResponseHandlerFactory.Default.StreamedInspectionCallback = configuration.HttpMessageStreamedInspectionHandler ?? throw new ArgumentException("The streaming content inspection callback MUST be defined.", nameof(configuration));
-            FilterResponseHandlerFactory.Default.ReplayInspectionCallback = configuration.HttpMessageReplayInspectionCallback ?? throw new ArgumentException("The replay content inspection callback MUST be defined.", nameof(configuration));
+            _replayResponseFactory = new ReplayResponseHandlerFactory();
+            _httpResponseFactory = new FilterResponseHandlerFactory(_configuration.CustomProxyHandler, _replayResponseFactory)
+            {
+                NewMessageCallback = configuration.NewHttpMessageHandler ?? throw new ArgumentException("The new message callback MUST be defined.", nameof(configuration)),
+                WholeBodyInspectionCallback = configuration.HttpMessageWholeBodyInspectionHandler ?? throw new ArgumentException("The whole-body content inspection callback MUST be defined.", nameof(configuration)),
+                StreamedInspectionCallback = configuration.HttpMessageStreamedInspectionHandler ?? throw new ArgumentException("The streaming content inspection callback MUST be defined.", nameof(configuration)),
+                ReplayInspectionCallback = configuration.HttpMessageReplayInspectionCallback ?? throw new ArgumentException("The replay content inspection callback MUST be defined.", nameof(configuration))
+            };
 
             // Hook the cert verification callback.
             ServicePointManager.ServerCertificateValidationCallback += CertificateVerificationHandler;
@@ -175,7 +197,8 @@ namespace CitadelCore.Net.Proxy
                 IPEndPoint v4HttpEndpoint = null;
                 IPEndPoint v4HttpsEndpoint = null;
 
-                var publicV4Host = CreateHost<PublicServerStartup>(false, false, out v4HttpEndpoint, out v4HttpsEndpoint);
+                var publicV4Startup = new PublicServerStartup(null, _httpResponseFactory);
+                var publicV4Host = CreateHost<PublicServerStartup>(false, false, out v4HttpEndpoint, out v4HttpsEndpoint, publicV4Startup);
 
                 V4HttpEndpoint = v4HttpEndpoint;
                 V4HttpsEndpoint = v4HttpsEndpoint;
@@ -184,7 +207,8 @@ namespace CitadelCore.Net.Proxy
                 IPEndPoint v6HttpEndpoint = null;
                 IPEndPoint v6HttpsEndpoint = null;
 
-                var publicV6Host = CreateHost<PublicServerStartup>(false, true, out v6HttpEndpoint, out v6HttpsEndpoint);
+                var publicV6Startup = new PublicServerStartup(null, _httpResponseFactory);
+                var publicV6Host = CreateHost<PublicServerStartup>(false, true, out v6HttpEndpoint, out v6HttpsEndpoint, publicV6Startup);
 
                 V6HttpEndpoint = v6HttpEndpoint;
                 V6HttpsEndpoint = v6HttpsEndpoint;
@@ -193,10 +217,11 @@ namespace CitadelCore.Net.Proxy
                 IPEndPoint privateV4HttpEndpoint = null;
                 IPEndPoint privateV4HttpsEndpoint = null;
 
-                var privateV4Host = CreateHost<PrivateServerStartup>(true, false, out privateV4HttpEndpoint, out privateV4HttpsEndpoint);
+                var privateV4Startup = new PrivateServerStartup(null, _replayResponseFactory);
+                var privateV4Host = CreateHost<PrivateServerStartup>(true, false, out privateV4HttpEndpoint, out privateV4HttpsEndpoint, privateV4Startup);
 
-                ReplayResponseHandlerFactory.Default.V4HttpEndpoint = privateV4HttpEndpoint;
-                ReplayResponseHandlerFactory.Default.V4HttpsEndpoint = privateV4HttpsEndpoint;
+                _replayResponseFactory.V4HttpEndpoint = privateV4HttpEndpoint;
+                _replayResponseFactory.V4HttpsEndpoint = privateV4HttpsEndpoint;
 
                 _hosts = new List<IWebHost>()
                 {
@@ -348,6 +373,9 @@ namespace CitadelCore.Net.Proxy
         /// <param name="boundHttpsEndpoint">
         /// The endpoint that the HTTPS host was bound to.
         /// </param>
+        /// <param name="startupInsance">
+        /// The startup instance to use for the server.
+        /// </param>
         /// <returns>
         /// An IWebHost that will transparently proxy all requests.
         /// </returns>
@@ -355,7 +383,7 @@ namespace CitadelCore.Net.Proxy
         /// In the event that the internal kestrel engine doesn't properly initialize, this method
         /// will throw.
         /// </exception>
-        private IWebHost CreateHost<T>(bool isPrivate, bool isV6, out IPEndPoint boundHttpEndpoint, out IPEndPoint boundHttpsEndpoint) where T : class
+        private IWebHost CreateHost<T>(bool isPrivate, bool isV6, out IPEndPoint boundHttpEndpoint, out IPEndPoint boundHttpsEndpoint, IStartup startupInsance) where T : class
         {
             WebHostBuilder ipWebhostBuilder = new WebHostBuilder();
 
@@ -413,16 +441,18 @@ namespace CitadelCore.Net.Proxy
             // Add compression for responses.
             ipWebhostBuilder.ConfigureServices(serviceOpts =>
             {
+                startupInsance.ConfigureServices(serviceOpts);
                 serviceOpts.AddResponseCompression();
+
+                // Add existing startup instance! This is how/where we handle connections.
+                serviceOpts.AddSingleton<IStartup>(startupInsance);
             });
 
             ipWebhostBuilder.Configure(cfgApp =>
             {
+                startupInsance.Configure(cfgApp);
                 cfgApp.UseResponseCompression();
             });
-
-            // Configures how we handle requests and errors, etc.
-            ipWebhostBuilder.UseStartup<T>();
 
             // Build host. You needed this comment.
             var vHost = ipWebhostBuilder.Build();
@@ -450,10 +480,16 @@ namespace CitadelCore.Net.Proxy
         /// Startup class for public IWebHosts. This configures the host for important things like
         /// how to handle errors and how to handle requests.
         /// </summary>
-        private class PublicServerStartup
+        private class PublicServerStartup : IStartup
         {
-            public PublicServerStartup(IHostingEnvironment env)
+            /// <summary>
+            /// Server-specific handler factory.
+            /// </summary>
+            private readonly FilterResponseHandlerFactory _handlerFactory;
+
+            public PublicServerStartup(IHostingEnvironment env, FilterResponseHandlerFactory handlerFactory)
             {
+                _handlerFactory = handlerFactory;
             }
 
             public void Configure(IApplicationBuilder app)
@@ -500,11 +536,16 @@ namespace CitadelCore.Net.Proxy
                 app.Run(context =>
                 {
                     return Task.Run(async () =>
-                    {
-                        var handler = FilterResponseHandlerFactory.Default.GetHandler(context);
+                    {   
+                        var handler = _handlerFactory.GetHandler(context);
                         await handler.Handle(context);
                     });
                 });
+            }
+
+            public IServiceProvider ConfigureServices(IServiceCollection services)
+            {
+                return services?.BuildServiceProvider();
             }
         }
 
@@ -512,10 +553,16 @@ namespace CitadelCore.Net.Proxy
         /// Startup class for private IWebHosts. This configures the host for important things like
         /// how to handle errors and how to handle requests.
         /// </summary>
-        private class PrivateServerStartup
+        private class PrivateServerStartup : IStartup
         {
-            public PrivateServerStartup(IHostingEnvironment env)
+            /// <summary>
+            /// Server-specific handler factory.
+            /// </summary>
+            private readonly ReplayResponseHandlerFactory _handlerFactory;
+
+            public PrivateServerStartup(IHostingEnvironment env, ReplayResponseHandlerFactory handlerFactory)
             {
+                _handlerFactory = handlerFactory;
             }
 
             public void Configure(IApplicationBuilder app)
@@ -563,7 +610,7 @@ namespace CitadelCore.Net.Proxy
                 {
                     return Task.Run(async () =>
                     {
-                        var handler = ReplayResponseHandlerFactory.Default.GetHandler(context);
+                        var handler = _handlerFactory.GetHandler(context);
 
                         if (handler != null)
                         {
@@ -575,6 +622,11 @@ namespace CitadelCore.Net.Proxy
                         }
                     });
                 });
+            }
+
+            public IServiceProvider ConfigureServices(IServiceCollection services)
+            {
+                return services?.BuildServiceProvider();
             }
         }
     }
