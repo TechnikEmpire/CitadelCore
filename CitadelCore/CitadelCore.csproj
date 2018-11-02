@@ -12,14 +12,13 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/TechnikEmpire/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Adds the ability for users to fullfill HTTP requests themselves.
-Adds the ability for users to supply their own HttpClient's on a per-request basis to fulfill requests with.</PackageReleaseNotes>
+    <PackageReleaseNotes>Fixes an issue where the convenience content-type property of HttpMessageInfo was not being set.</PackageReleaseNotes>
     <Title>CitadelCore</Title>
     <Summary>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Summary>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>3.6.0</Version>
-    <AssemblyVersion>3.6.0.0</AssemblyVersion>
-    <FileVersion>3.6.0.0</FileVersion>    
+    <Version>3.6.1</Version>
+    <AssemblyVersion>3.6.1.0</AssemblyVersion>
+    <FileVersion>3.6.1.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">
