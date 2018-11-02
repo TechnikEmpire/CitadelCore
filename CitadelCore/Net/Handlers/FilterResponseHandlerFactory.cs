@@ -46,18 +46,24 @@ namespace CitadelCore.Net.Handlers
         private readonly ReplayResponseHandlerFactory _replayFactory;
 
         /// <summary>
+        /// Shared configuration used to construct the host proxy-server.
+        /// </summary>
+        private readonly ProxyServerConfiguration _configuration;
+
+        /// <summary>
         /// Constructs a new instance.
         /// </summary>
-        /// <param name="customProxyConnectionHandler">
-        /// A user-defined, custom handler for the HTTP client. If not defined, will be created with
-        /// built-in defaults.
+        /// <param name="configuration">
+        /// The shared, proxy configuration.
         /// </param>
         /// <param name="replayFactory">
         /// A shared, non-owning instance of the replay factory we'll let our HTTP handlers create
         /// replays with, if requested by the user.
         /// </param>
-        internal FilterResponseHandlerFactory(HttpMessageHandler customProxyConnectionHandler, ReplayResponseHandlerFactory replayFactory)
+        internal FilterResponseHandlerFactory(ProxyServerConfiguration configuration, ReplayResponseHandlerFactory replayFactory)
         {
+            _configuration = configuration;
+
             _replayFactory = replayFactory;
 
             if (replayFactory == null)
@@ -70,9 +76,9 @@ namespace CitadelCore.Net.Handlers
             // this will not work.
             //
             // Of course, if the user wants to manage this, then we just use their handler.
-            if (customProxyConnectionHandler == null)
+            if (configuration.CustomProxyHandler == null)
             {
-                customProxyConnectionHandler = new HttpClientHandler
+                configuration.CustomProxyHandler = new HttpClientHandler
                 {
 
                     AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
@@ -83,44 +89,9 @@ namespace CitadelCore.Net.Handlers
                 };
             }
 
-            _client = new HttpClient(customProxyConnectionHandler);
+            _client = new HttpClient(configuration.CustomProxyHandler, true);
         }
 
-        /// <summary>
-        /// The new message callback, supplied to newly created handlers.
-        /// </summary>
-        public NewHttpMessageHandler NewMessageCallback
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// The whole-body content inspection callback, supplied to newly created handlers.
-        /// </summary>
-        public HttpMessageWholeBodyInspectionHandler WholeBodyInspectionCallback
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// The streamed content inspection callback, supplied to newly created handlers.
-        /// </summary>
-        public HttpMessageStreamedInspectionHandler StreamedInspectionCallback
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// The replay content inspection callback, supplied to newly created handlers.
-        /// </summary>
-        public HttpMessageReplayInspectionHandler ReplayInspectionCallback
-        {
-            get;
-            set;
-        }
 
         /// <summary>
         /// Constructs and returns the appropriate handler for the supplied HTTP context.
@@ -152,7 +123,7 @@ namespace CitadelCore.Net.Handlers
         /// </returns>
         private AbstractFilterResponseHandler HandleWebsocket(HttpContext context)
         {
-            return new FilterWebsocketHandler(NewMessageCallback, WholeBodyInspectionCallback, StreamedInspectionCallback, ReplayInspectionCallback);
+            return new FilterWebsocketHandler(_configuration);
         }
 
         /// <summary>
@@ -166,7 +137,7 @@ namespace CitadelCore.Net.Handlers
         /// </returns>
         private AbstractFilterResponseHandler HandleHttp(HttpContext context)
         {
-            return new FilterHttpResponseHandler(_client, _replayFactory, NewMessageCallback, WholeBodyInspectionCallback, StreamedInspectionCallback, ReplayInspectionCallback);
+            return new FilterHttpResponseHandler(_client, _replayFactory, _configuration);
         }
 
         /// <summary>
@@ -181,7 +152,7 @@ namespace CitadelCore.Net.Handlers
         /// </returns>
         private AbstractFilterResponseHandler HandleUnknownProtocol(HttpContext context)
         {
-            return new FilterPassthroughResponseHandler(NewMessageCallback, WholeBodyInspectionCallback, StreamedInspectionCallback, ReplayInspectionCallback);
+            return new FilterPassthroughResponseHandler(_configuration);
         }
     }
 }

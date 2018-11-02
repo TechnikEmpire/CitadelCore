@@ -6,6 +6,7 @@
 */
 
 using CitadelCore.IO;
+using System.Net.Http;
 
 namespace CitadelCore.Net.Proxy
 {
@@ -83,6 +84,11 @@ namespace CitadelCore.Net.Proxy
         /// receiving a real-time duplication of the data, and as such can also terminate the stream
         /// before full completion if your inspection of the replay causes you to make this determination.
         /// </remarks>
-        AllowButRequestResponseReplay = 5
+        AllowButRequestResponseReplay = 5,
+
+        /// <summary>
+        /// This action enables users to fulfill the request or response at-will.
+        /// </summary>
+        AllowButDelegateHandler,
     }
 }

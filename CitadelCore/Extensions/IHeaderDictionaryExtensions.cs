@@ -13,7 +13,7 @@ namespace CitadelCore.Extensions
     /// <summary>
     /// Extensions for <see cref="IHeaderDictionary" /> instances.
     /// </summary>
-    internal static class IHeaderDictionaryExtensions
+    public static class IHeaderDictionaryExtensions
     {
         /// <summary>
         /// Converts the IHeaderDictionary instance to a NameValueCollection.

@@ -33,24 +33,15 @@ namespace CitadelCore.Net.Handlers
         /// <summary>
         /// Constructs a FilterWebsocketHandler instance.
         /// </summary>
-        /// <param name="newMessageCallback">
-        /// Callback used for new messages.
+        /// <param name="configuration">
+        /// The shared, proxy configuration.
         /// </param>
-        /// <param name="wholeBodyInspectionCallback">
-        /// Callback used when full-body content inspection is requested on a new message.
-        /// </param>
-        /// <param name="streamInspectionCallback">
-        /// Callback used when streamed content inspection is requested on a new message.
-        /// </param>
-        /// <param name="replayInspectionCallback">
-        /// Callback used when replay content inspection is requested on HTTP response message.
-        /// </param>
+        /// <exception cref="ArgumentException">
+        /// If the supplied configuration is null or invalid, this constructor will throw.
+        /// </exception>
         public FilterWebsocketHandler(
-            NewHttpMessageHandler newMessageCallback,
-            HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback,
-            HttpMessageStreamedInspectionHandler streamInspectionCallback,
-            HttpMessageReplayInspectionHandler replayInspectionCallback
-            ) : base(newMessageCallback, wholeBodyInspectionCallback, streamInspectionCallback, replayInspectionCallback)
+            ProxyServerConfiguration configuration
+            ) : base(configuration)
         {
         }
 
@@ -167,7 +158,7 @@ namespace CitadelCore.Net.Handlers
                     LocalPort = (ushort)context.Connection.LocalPort
                 };
 
-                _newMessageCb?.Invoke(msgNfo);
+                _configuration.NewHttpMessageHandler?.Invoke(msgNfo);
 
                 switch (msgNfo.ProxyNextAction)
                 {

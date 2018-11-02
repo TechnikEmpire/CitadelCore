@@ -54,28 +54,19 @@ namespace CitadelCore.Net.Handlers
         /// The HttpClient instance to use.
         /// </param>
         /// <param name="replayFactory">
-        /// The shared, non-owning instance of the replay factory we'll use to create replays at user-request.
+        /// The replay factory to use for creating new replay instances as requested.
         /// </param>
-        /// <param name="newMessageCallback">
-        /// Callback used for new messages.
+        /// <param name="configuration">
+        /// The shared, proxy configuration.
         /// </param>
-        /// <param name="wholeBodyInspectionCallback">
-        /// Callback used when full-body content inspection is requested on a new message.
-        /// </param>
-        /// <param name="streamInspectionCallback">
-        /// Callback used when streamed content inspection is requested on a new message.
-        /// </param>
-        /// <param name="replayInspectionCallback">
-        /// Callback used when replay content inspection is requested on HTTP response message.
-        /// </param>
+        /// <exception cref="ArgumentException">
+        /// If the supplied configuration is null or invalid, this constructor will throw.
+        /// </exception>
         public FilterHttpResponseHandler(
             HttpClient client,
             ReplayResponseHandlerFactory replayFactory,
-            NewHttpMessageHandler newMessageCallback,
-            HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback,
-            HttpMessageStreamedInspectionHandler streamInspectionCallback,
-            HttpMessageReplayInspectionHandler replayInspectionCallback
-            ) : base(newMessageCallback, wholeBodyInspectionCallback, streamInspectionCallback, replayInspectionCallback)
+            ProxyServerConfiguration configuration
+            ) : base(configuration)
         {
             _client = client;
             _replayFactory = replayFactory;
@@ -93,7 +84,9 @@ namespace CitadelCore.Net.Handlers
         public override async Task Handle(HttpContext context)
         {
             HttpRequestMessage requestMsg = null;
-            
+
+            HttpClient upstreamClient = _client;
+
             try
             {
                 // Use helper to get the full, proper URL for the request. var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
@@ -153,7 +146,7 @@ namespace CitadelCore.Net.Handlers
                     LocalPort = (ushort)context.Connection.LocalPort
                 };
 
-                _newMessageCb?.Invoke(requestMessageNfo);
+                _configuration.NewHttpMessageHandler?.Invoke(requestMessageNfo);
 
                 if (requestMessageNfo.ProxyNextAction == ProxyNextAction.DropConnection)
                 {
@@ -162,6 +155,16 @@ namespace CitadelCore.Net.Handlers
                     await context.Response.ApplyMessageInfo(requestMessageNfo, context.RequestAborted);
                     return;
                 }
+
+                if (requestMessageNfo.ProxyNextAction == ProxyNextAction.AllowButDelegateHandler)
+                {
+                    // Apply whatever the user did here and then quit.
+                    await _configuration.HttpExternalRequestHandlerCallback?.Invoke(requestMessageNfo, context);
+                    return;
+                }
+
+                // Check to see if the user has set their own client to fulfill the request with.
+                upstreamClient = requestMessageNfo.FulfillmentClient ?? _client;
 
                 // Create the message AFTER we give the user a chance to alter things.
                 requestMsg = new HttpRequestMessage(requestMessageNfo.Method, requestMessageNfo.Url);
@@ -215,7 +218,7 @@ namespace CitadelCore.Net.Handlers
                                             BodyInternal = requestBody
                                         };
 
-                                        _wholeBodyInspectionCb?.Invoke(requestMessageNfo);
+                                        _configuration.HttpMessageWholeBodyInspectionHandler?.Invoke(requestMessageNfo);
 
                                         if (requestMessageNfo.ProxyNextAction == ProxyNextAction.DropConnection)
                                         {
@@ -226,6 +229,9 @@ namespace CitadelCore.Net.Handlers
 
                                             return;
                                         }
+
+                                        // Check to see if the user has set their own client to fulfill the request with.
+                                        upstreamClient = requestMessageNfo.FulfillmentClient ?? _client;
 
                                         // Since the user may have modified things, we'll now
                                         // re-create the request no matter what.
@@ -285,7 +291,7 @@ namespace CitadelCore.Net.Handlers
 
                         default:
                             {
-                                if (context.Request.ContentLength.HasValue && context.Request.ContentLength.Value > 0)
+                                if (context.Request.Body != null && (context.Request.Headers.ContainsKey("Transfer-Encoding") || (context.Request.ContentLength.HasValue && context.Request.ContentLength.Value > 0)))
                                 {
                                     // We have a body, but the user doesn't want to inspect it. So,
                                     // we'll just set our content to wrap the context's input stream.
@@ -320,7 +326,7 @@ namespace CitadelCore.Net.Handlers
                 {
                     try
                     {
-                        response = await _client.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+                        response = await upstreamClient.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
                     }
                     catch (Exception e)
                     {
@@ -369,6 +375,7 @@ namespace CitadelCore.Net.Handlers
                         var responseMessageNfo = new HttpMessageInfo
                         {
                             Url = reqUrl,
+                            OriginatingMessage = requestMessageNfo,
                             MessageId = requestMessageNfo.MessageId,
                             IsEncrypted = context.Request.IsHttps,
                             Headers = response.ExportAllHeaders(),
@@ -382,7 +389,7 @@ namespace CitadelCore.Net.Handlers
                             LocalPort = (ushort)context.Connection.LocalPort
                         };
 
-                        _newMessageCb?.Invoke(responseMessageNfo);
+                        _configuration.NewHttpMessageHandler?.Invoke(responseMessageNfo);
 
                         if (responseMessageNfo.ProxyNextAction == ProxyNextAction.DropConnection)
                         {
@@ -390,6 +397,13 @@ namespace CitadelCore.Net.Handlers
                             context.Response.ClearAllHeaders();
                             await context.Response.ApplyMessageInfo(responseMessageNfo, context.RequestAborted);
 
+                            return;
+                        }
+
+                        if (responseMessageNfo.ProxyNextAction == ProxyNextAction.AllowButDelegateHandler)
+                        {
+                            // Apply whatever the user did here and then quit.
+                            await _configuration.HttpExternalRequestHandlerCallback.Invoke(responseMessageNfo, context);
                             return;
                         }
 
@@ -412,6 +426,7 @@ namespace CitadelCore.Net.Handlers
                                             responseMessageNfo = new HttpMessageInfo
                                             {
                                                 Url = reqUrl,
+                                                OriginatingMessage = requestMessageNfo,
                                                 MessageId = requestMessageNfo.MessageId,
                                                 IsEncrypted = context.Request.IsHttps,
                                                 Headers = response.ExportAllHeaders(),
@@ -426,7 +441,7 @@ namespace CitadelCore.Net.Handlers
                                                 BodyInternal = responseBody
                                             };
 
-                                            _wholeBodyInspectionCb?.Invoke(responseMessageNfo);
+                                            _configuration.HttpMessageWholeBodyInspectionHandler?.Invoke(responseMessageNfo);
 
                                             if (responseMessageNfo.ProxyNextAction == ProxyNextAction.DropConnection)
                                             {
@@ -480,6 +495,7 @@ namespace CitadelCore.Net.Handlers
                                     responseMessageNfo = new HttpMessageInfo
                                     {
                                         Url = reqUrl,
+                                        OriginatingMessage = requestMessageNfo,
                                         MessageId = requestMessageNfo.MessageId,
                                         IsEncrypted = context.Request.IsHttps,
                                         Headers = response.ExportAllHeaders(),
@@ -515,6 +531,7 @@ namespace CitadelCore.Net.Handlers
                                     responseMessageNfo = new HttpMessageInfo
                                     {
                                         Url = reqUrl,
+                                        OriginatingMessage = requestMessageNfo,
                                         MessageId = requestMessageNfo.MessageId,
                                         IsEncrypted = context.Request.IsHttps,
                                         Headers = response.ExportAllHeaders(),
@@ -563,7 +580,7 @@ namespace CitadelCore.Net.Handlers
                                                 replay.BodyComplete = true;
                                             };
 
-                                            _replayInspectionCb?.Invoke(replay.ReplayUrl, cancellationFunction);
+                                            _configuration.HttpMessageReplayInspectionCallback?.Invoke(replay.ReplayUrl, cancellationFunction);
 
                                             await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(wrappedStream, context.Response.Body, null, context.RequestAborted);
                                         }
@@ -661,7 +678,7 @@ namespace CitadelCore.Net.Handlers
         private void OnWrappedStreamRead(InspectionStream stream, Memory<byte> buffer, out bool dropConnection)
         {
             dropConnection = false;
-            _streamInpsectionCb?.Invoke(stream.MessageInfo, StreamOperation.Read, buffer, out dropConnection);
+            _configuration.HttpMessageStreamedInspectionHandler?.Invoke(stream.MessageInfo, StreamOperation.Read, buffer, out dropConnection);
         }
 
         /// <summary>
@@ -679,7 +696,7 @@ namespace CitadelCore.Net.Handlers
         private void OnWrappedStreamWrite(InspectionStream stream, Memory<byte> buffer, out bool dropConnection)
         {
             dropConnection = false;
-            _streamInpsectionCb?.Invoke(stream.MessageInfo, StreamOperation.Write, buffer, out dropConnection);
+            _configuration.HttpMessageStreamedInspectionHandler?.Invoke(stream.MessageInfo, StreamOperation.Write, buffer, out dropConnection);
         }
 
         /// <summary>
@@ -697,7 +714,7 @@ namespace CitadelCore.Net.Handlers
         private void OnWrappedStreamClose(InspectionStream stream, Memory<byte> buffer, out bool dropConnection)
         {
             dropConnection = false;
-            _streamInpsectionCb?.Invoke(stream.MessageInfo, StreamOperation.Close, buffer, out dropConnection);
+            _configuration.HttpMessageStreamedInspectionHandler?.Invoke(stream.MessageInfo, StreamOperation.Close, buffer, out dropConnection);
         }
     }
 }

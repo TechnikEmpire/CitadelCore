@@ -98,6 +98,32 @@ namespace CitadelCore.Net.Proxy
         }
 
         /// <summary>
+        /// The callback for delegating request fullfillment to the library user, when request.
+        /// </summary>
+        public HttpExternalRequestHandler HttpExternalRequestHandlerCallback
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// Gets whether or not the configuration is valid.
+        /// </summary>
+        public bool IsValid
+        {
+            get
+            {
+                return
+                    FirewallCheckCallback != null &&
+                    NewHttpMessageHandler != null &&
+                    HttpMessageWholeBodyInspectionHandler != null &&
+                    HttpMessageStreamedInspectionHandler != null &&
+                    HttpMessageReplayInspectionCallback != null &&
+                    HttpExternalRequestHandlerCallback != null;
+            }
+        }
+
+        /// <summary>
         /// Configures the proxy server to use the supplied string for the common name when issuing certificates.
         /// </summary>
         /// <param name="authorityName">

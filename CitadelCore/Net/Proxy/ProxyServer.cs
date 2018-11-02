@@ -140,17 +140,16 @@ namespace CitadelCore.Net.Proxy
         {
             _configuration = configuration;
 
+            if (_configuration == null || !_configuration.IsValid)
+            {
+                throw new ArgumentException("Configuration is null or invalid. Ensure that all callbacks are defined.");
+            }
+
             _tlsConnAdapter = new TlsSniConnectionAdapter(CreateCertificateStore(configuration.AuthorityName ?? "CitadelCore"));
             _fwCallback = configuration.FirewallCheckCallback ?? throw new ArgumentException("The firewall callback MUST be defined.", nameof(configuration));
 
             _replayResponseFactory = new ReplayResponseHandlerFactory();
-            _httpResponseFactory = new FilterResponseHandlerFactory(_configuration.CustomProxyHandler, _replayResponseFactory)
-            {
-                NewMessageCallback = configuration.NewHttpMessageHandler ?? throw new ArgumentException("The new message callback MUST be defined.", nameof(configuration)),
-                WholeBodyInspectionCallback = configuration.HttpMessageWholeBodyInspectionHandler ?? throw new ArgumentException("The whole-body content inspection callback MUST be defined.", nameof(configuration)),
-                StreamedInspectionCallback = configuration.HttpMessageStreamedInspectionHandler ?? throw new ArgumentException("The streaming content inspection callback MUST be defined.", nameof(configuration)),
-                ReplayInspectionCallback = configuration.HttpMessageReplayInspectionCallback ?? throw new ArgumentException("The replay content inspection callback MUST be defined.", nameof(configuration))
-            };
+            _httpResponseFactory = new FilterResponseHandlerFactory(_configuration, _replayResponseFactory);
 
             // Hook the cert verification callback.
             ServicePointManager.ServerCertificateValidationCallback += CertificateVerificationHandler;

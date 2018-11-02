@@ -63,6 +63,32 @@ namespace CitadelCore.Net.Http
         } = (uint)Interlocked.Increment(ref s_messageIdGen);
 
         /// <summary>
+        /// The originating request message, if any.
+        /// </summary>
+        /// <remarks>
+        /// In the event that this message represents a request, this property will ne null. If this
+        /// message represents a response, then this property will contain the original request
+        /// message information.
+        /// </remarks>
+        public HttpMessageInfo OriginatingMessage
+        {
+            get;
+            internal set;
+        } = null;
+
+        /// <summary>
+        /// Gets or sets a custom <seealso cref="HttpClient" /> with which to fulfill the request.
+        /// </summary>
+        /// <remarks>
+        /// Valid only when the <seealso cref="HttpMessageInfo.MessageType" /> is equal to <seealso cref="MessageType.Request" />.
+        /// </remarks>
+        public HttpClient FulfillmentClient
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
         /// Gets or sets the message method.
         /// </summary>
         public HttpMethod Method

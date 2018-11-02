@@ -20,9 +20,9 @@ using System.Threading.Tasks;
 namespace CitadelCore.Extensions
 {
     /// <summary>
-    /// Extensions for the <see cref="HttpRequest" /> class.
+    /// Extensions for <see cref="HttpRequest" /> instances.
     /// </summary>
-    internal static class HttpRequestExtensions
+    public static class HttpRequestExtensions
     {
         /// <summary>
         /// Copies all possible headers from the given collection into this HttpResponse instance and

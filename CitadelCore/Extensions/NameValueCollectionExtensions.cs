@@ -12,9 +12,9 @@ using System.Collections.Specialized;
 namespace CitadelCore.Extensions
 {
     /// <summary>
-    /// Extensions for the <see cref="NameValueCollection" /> class.
+    /// Extensions for <see cref="NameValueCollection" /> instances.
     /// </summary>
-    internal static class NameValueCollectionExtensions
+    public static class NameValueCollectionExtensions
     {
         private static readonly char[] s_splitChars = new[] { ',' };
 

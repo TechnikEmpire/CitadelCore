@@ -7,6 +7,7 @@
 
 using CitadelCore.Net.Proxy;
 using Microsoft.AspNetCore.Http;
+using System;
 using System.Threading.Tasks;
 
 namespace CitadelCore.Net.Handlers
@@ -17,55 +18,34 @@ namespace CitadelCore.Net.Handlers
     internal abstract class AbstractFilterResponseHandler
     {
         /// <summary>
-        /// Callback used for new messages.
-        /// </summary>
-        protected NewHttpMessageHandler _newMessageCb;
-
-        /// <summary>
-        /// Callback used when full-body content inspection is requested on a new message.
-        /// </summary>
-        protected HttpMessageWholeBodyInspectionHandler _wholeBodyInspectionCb;
-
-        /// <summary>
-        /// Callback used when streamed content inspection is requested on a new message.
-        /// </summary>
-        protected HttpMessageStreamedInspectionHandler _streamInpsectionCb;
-
-        /// <summary>
-        /// Callback used when replay content inspection is request on a HTTP response.
-        /// </summary>
-        protected HttpMessageReplayInspectionHandler _replayInspectionCb;
-
-        /// <summary>
         /// For writing empty responses without new allocations.
         /// </summary>
         protected static readonly byte[] s_nullBody = new byte[0];
 
         /// <summary>
+        /// Private, shared configuration instance that we use for user-defined handlers.
+        /// </summary>
+        protected readonly ProxyServerConfiguration _configuration;
+
+        /// <summary>
         /// Constructs a AbstractFilterResponseHandler instance.
         /// </summary>
-        /// <param name="newMessageCallback">
-        /// Callback used for new messages.
+        /// <param name="configuration">
+        /// The shared, proxy configuration.
         /// </param>
-        /// <param name="wholeBodyInspectionCallback">
-        /// Callback used when full-body content inspection is requested on a new message.
-        /// </param>
-        /// <param name="streamInspectionCallback">
-        /// Callback used when streamed content inspection is requested on a new message.
-        /// </param>
-        /// <param name="replayInspectionCallback">
-        /// Callback used when replay content inspection is requested on HTTP response message.
-        /// </param>
+        /// <exception cref="ArgumentException">
+        /// If the supplied configuration is null or invalid, this constructor will throw.
+        /// </exception>
         public AbstractFilterResponseHandler(
-            NewHttpMessageHandler newMessageCallback,
-            HttpMessageWholeBodyInspectionHandler wholeBodyInspectionCallback,
-            HttpMessageStreamedInspectionHandler streamInspectionCallback,
-            HttpMessageReplayInspectionHandler replayInspectionCallback)
+            ProxyServerConfiguration configuration
+            )
         {
-            _newMessageCb = newMessageCallback;
-            _wholeBodyInspectionCb = wholeBodyInspectionCallback;
-            _streamInpsectionCb = streamInspectionCallback;
-            _replayInspectionCb = replayInspectionCallback;
+            _configuration = configuration;
+
+            if (_configuration == null || !_configuration.IsValid)
+            {
+                throw new ArgumentException("Configuration is null or invalid. Ensure it is defined, and that all callbacks are defined.");
+            }
         }
 
         /// <summary>

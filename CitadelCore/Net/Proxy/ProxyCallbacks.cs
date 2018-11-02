@@ -7,7 +7,10 @@
 
 using CitadelCore.IO;
 using CitadelCore.Net.Http;
+using Microsoft.AspNetCore.Http;
 using System;
+using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace CitadelCore.Net.Proxy
 {
@@ -94,4 +97,18 @@ namespace CitadelCore.Net.Proxy
     /// For more information, see the remarks on <seealso cref="ProxyNextAction.AllowButRequestResponseReplay" />.
     /// </remarks>
     public delegate void HttpMessageReplayInspectionHandler(string replayUrl, HttpReplayTerminationCallback cancellationCallback);
+
+    /// <summary>
+    /// Delegate for delegating request/response handling to the library user.
+    /// </summary>
+    /// <param name="messageInfo">
+    /// The message info object.
+    /// </param>
+    /// <param name="context">
+    /// The HTTP context with which to fulfill the request and/or response.
+    /// </param>
+    /// <returns>
+    /// A completion task.
+    /// </returns>
+    public delegate Task HttpExternalRequestHandler(HttpMessageInfo messageInfo, HttpContext context);
 }

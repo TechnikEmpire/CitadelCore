@@ -12,17 +12,14 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/TechnikEmpire/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Adds the ability to exclude headers from being excluded. Normally forbidden headers are stripped, but now the user can control this.
-Adds the ability to configure the proxy server in regards to dropping external proxy packets (originating from another proxy on the local machine).
-Adds the ability to provide a custom message handler for all proxy server upstream connections. This enables you to define an upstream proxy, etc.
-Fixes an issue where the host header is not set correctly on modification.
-Purges singlestons from the source code. Handlers are now instance members of proxy server classes via hidden IStartup instances.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds the ability for users to fullfill HTTP requests themselves.
+Adds the ability for users to supply their own HttpClient's on a per-request basis to fulfill requests with.</PackageReleaseNotes>
     <Title>CitadelCore</Title>
     <Summary>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Summary>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>3.4.1</Version>
-    <AssemblyVersion>3.4.1.0</AssemblyVersion>
-    <FileVersion>3.4.1.0</FileVersion>    
+    <Version>3.6.0</Version>
+    <AssemblyVersion>3.6.0.0</AssemblyVersion>
+    <FileVersion>3.6.0.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">

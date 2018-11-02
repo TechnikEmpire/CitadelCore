@@ -10,8 +10,7 @@ using System.Net;
 namespace CitadelCore.Extensions
 {
     /// <summary>
-    /// IPAddressExtensions provides some convenience functions, such as the ability to more
-    /// accurately determine if an IP address is private.
+    /// Extension methods for <seealso cref="IPAddress"/> instances.
     /// </summary>
     public static class IPAddressExtensions
     {

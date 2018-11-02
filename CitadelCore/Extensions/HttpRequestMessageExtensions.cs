@@ -17,7 +17,10 @@ using System.Threading;
 
 namespace CitadelCore.Extensions
 {
-    internal static class HttpRequestMessageExtensions
+    /// <summary>
+    /// Extension methods for <seealso cref="HttpRequestMessage"/> instances.
+    /// </summary>
+    public static class HttpRequestMessageExtensions
     {
         /// <summary>
         /// Copies all possible headers from the given collection into this HttpRequestMessage
