@@ -30,7 +30,11 @@ namespace CitadelCore.Net.ConnectionAdapters
     /// </summary>
     internal class TlsSniConnectionAdapter : IConnectionAdapter
     {
-        public bool IsHttps => true;
+        public bool IsHttps
+        {
+            get;
+            private set;
+        }
 
         /// <summary>
         /// Holds our certificate store. This is responsible for spoofing, storing and retrieving TLS certificates.
@@ -78,15 +82,17 @@ namespace CitadelCore.Net.ConnectionAdapters
             {
                 // We start off by handing the connection stream off to a library that can do a peek
                 // read (which is really just doing buffering tricks, not an actual peek read).
-                var yourClientStream = new CustomBufferedStream(context.ConnectionStream, 4096);
+                var clientStream = new CustomBufferedStream(context.ConnectionStream, 4096);
 
                 // We then use the same lib to parse the "peeked" data and extract the SNI hostname.
-                var clientSslHelloInfo = await SslTools.PeekClientHello(yourClientStream);
+                var clientSslHelloInfo = await SslTools.PeekClientHello(clientStream);
 
                 switch (clientSslHelloInfo != null)
                 {
                     case true:
                         {
+                            IsHttps = true;
+
                             string sniHost = clientSslHelloInfo.Extensions?.FirstOrDefault(x => x.Name == "server_name")?.Data;
 
                             if (string.IsNullOrEmpty(sniHost) || string.IsNullOrWhiteSpace(sniHost))
@@ -96,7 +102,7 @@ namespace CitadelCore.Net.ConnectionAdapters
 
                             try
                             {
-                                var sslStream = new SslStream(yourClientStream, true,
+                                var sslStream = new SslStream(clientStream, true,
                                     (object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors) =>
                                     {
                                         // TODO - Handle client certificates. They should be pushed
@@ -142,7 +148,7 @@ namespace CitadelCore.Net.ConnectionAdapters
                                     ClientCertificate = sslStream.RemoteCertificate?.ToV2Certificate()
                                 });
 
-                                return new HttpsAdaptedConnection(sslStream);
+                                return new HttpsConnection(sslStream);
                             }
                             catch (Exception err)
                             {
@@ -155,8 +161,8 @@ namespace CitadelCore.Net.ConnectionAdapters
 
                     default:
                         {
-                            LoggerProxy.Default.Error("No client hello!");
-                            return s_closedConnection;
+                            IsHttps = false;
+                            return new HttpConnection(clientStream);
                         }
                 }
             }
@@ -168,11 +174,28 @@ namespace CitadelCore.Net.ConnectionAdapters
             }
         }
 
-        private class HttpsAdaptedConnection : IAdaptedConnection
+        private class HttpConnection : IAdaptedConnection
+        {
+            private readonly Stream _plainHttpStream;
+
+            public HttpConnection(Stream stream)
+            {
+                _plainHttpStream = stream;
+            }
+
+            public Stream ConnectionStream => _plainHttpStream;
+
+            public void Dispose()
+            {
+                _plainHttpStream.Dispose();
+            }
+        }
+
+        private class HttpsConnection : IAdaptedConnection
         {
             private readonly SslStream _sslStream;
 
-            public HttpsAdaptedConnection(SslStream sslStream)
+            public HttpsConnection(SslStream sslStream)
             {
                 _sslStream = sslStream;
             }

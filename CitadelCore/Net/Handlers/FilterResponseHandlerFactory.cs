@@ -27,7 +27,7 @@ namespace CitadelCore.Net.Handlers
             // If this isn't set, we'll have a massive bottlenet on our upstream flow. The
             // performance gains here extreme. This must be set.
             ServicePointManager.DefaultConnectionLimit = ushort.MaxValue;
-
+            
             ServicePointManager.Expect100Continue = false;
             ServicePointManager.CheckCertificateRevocationList = true;
             ServicePointManager.ReusePort = true;

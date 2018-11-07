@@ -56,30 +56,10 @@ namespace CitadelCore.Net.Proxy
         }
 
         /// <summary>
-        /// Gets the IPV4 endpoint where HTTPS connections are being received. This will be ANY:0
-        /// until Start has been called.
-        /// </summary>
-        public IPEndPoint V4HttpsEndpoint
-        {
-            private set;
-            get;
-        }
-
-        /// <summary>
         /// Gets the IPV6 endpoint where HTTP connections are being received. This will be ANY:0
         /// until Start has been called.
         /// </summary>
         public IPEndPoint V6HttpEndpoint
-        {
-            private set;
-            get;
-        }
-
-        /// <summary>
-        /// Gets the IPV6 endpoint where HTTPS connections are being received. This will be ANY:0
-        /// until Start has been called.
-        /// </summary>
-        public IPEndPoint V6HttpsEndpoint
         {
             private set;
             get;
@@ -194,30 +174,26 @@ namespace CitadelCore.Net.Proxy
 
                 // Create the public, v4 proxy.
                 IPEndPoint v4HttpEndpoint = null;
-                IPEndPoint v4HttpsEndpoint = null;
 
                 var publicV4Startup = new PublicServerStartup(null, _httpResponseFactory);
-                var publicV4Host = CreateHost<PublicServerStartup>(false, false, out v4HttpEndpoint, out v4HttpsEndpoint, publicV4Startup);
+                var publicV4Host = CreateHost<PublicServerStartup>(false, false, out v4HttpEndpoint, publicV4Startup);
 
                 V4HttpEndpoint = v4HttpEndpoint;
-                V4HttpsEndpoint = v4HttpsEndpoint;
 
                 // Create the public, v6 proxy.
                 IPEndPoint v6HttpEndpoint = null;
-                IPEndPoint v6HttpsEndpoint = null;
 
                 var publicV6Startup = new PublicServerStartup(null, _httpResponseFactory);
-                var publicV6Host = CreateHost<PublicServerStartup>(false, true, out v6HttpEndpoint, out v6HttpsEndpoint, publicV6Startup);
+                var publicV6Host = CreateHost<PublicServerStartup>(false, true, out v6HttpEndpoint, publicV6Startup);
 
                 V6HttpEndpoint = v6HttpEndpoint;
-                V6HttpsEndpoint = v6HttpsEndpoint;
 
                 // Create the private, v4 replay proxy
                 IPEndPoint privateV4HttpEndpoint = null;
                 IPEndPoint privateV4HttpsEndpoint = null;
 
                 var privateV4Startup = new PrivateServerStartup(null, _replayResponseFactory);
-                var privateV4Host = CreateHost<PrivateServerStartup>(true, false, out privateV4HttpEndpoint, out privateV4HttpsEndpoint, privateV4Startup);
+                var privateV4Host = CreateHost<PrivateServerStartup>(true, false, out privateV4HttpEndpoint, privateV4Startup);
 
                 _replayResponseFactory.V4HttpEndpoint = privateV4HttpEndpoint;
                 _replayResponseFactory.V4HttpsEndpoint = privateV4HttpsEndpoint;
@@ -231,9 +207,9 @@ namespace CitadelCore.Net.Proxy
 
                 _diverter = CreateDiverter(
                         V4HttpEndpoint,
-                        V4HttpsEndpoint,
+                        V4HttpEndpoint,
                         V6HttpEndpoint,
-                        V6HttpsEndpoint
+                        V6HttpEndpoint
                     );
 
                 _diverter.ConfirmDenyFirewallAccess = (procPath) =>
@@ -369,9 +345,6 @@ namespace CitadelCore.Net.Proxy
         /// <param name="boundHttpEndpoint">
         /// The endpoint that the HTTP host was bound to.
         /// </param>
-        /// <param name="boundHttpsEndpoint">
-        /// The endpoint that the HTTPS host was bound to.
-        /// </param>
         /// <param name="startupInsance">
         /// The startup instance to use for the server.
         /// </param>
@@ -382,12 +355,11 @@ namespace CitadelCore.Net.Proxy
         /// In the event that the internal kestrel engine doesn't properly initialize, this method
         /// will throw.
         /// </exception>
-        private IWebHost CreateHost<T>(bool isPrivate, bool isV6, out IPEndPoint boundHttpEndpoint, out IPEndPoint boundHttpsEndpoint, IStartup startupInsance) where T : class
+        private IWebHost CreateHost<T>(bool isPrivate, bool isV6, out IPEndPoint boundHttpEndpoint, IStartup startupInsance) where T : class
         {
             WebHostBuilder ipWebhostBuilder = new WebHostBuilder();
 
             ListenOptions httpListenOptions = null;
-            ListenOptions httpsListenOptions = null;
 
             ipWebhostBuilder.UseSockets(opts =>
             {
@@ -410,21 +382,6 @@ namespace CitadelCore.Net.Proxy
                     // certificate spoofing based on the SNI value.
                     listenOpts.ConnectionAdapters.Add(_tlsConnAdapter);
 
-                    // Who doesn't love to kick that old Nagle to the curb?
-                    listenOpts.NoDelay = true;
-
-                    // HTTP 2 got cut last minute from 2.1 and MS speculates that it may take several
-                    // releases to get it properly included.
-                    // https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456
-                    // listenOpts.Protocols = HttpProtocols.Http1;
-
-                    httpsListenOptions = listenOpts;
-                });
-
-                // Listen for HTTP connections. Keep a reference to the options object so we can get
-                // the chosen port number after we call start.
-                opts.Listen(isV6 ? IPAddress.IPv6Any : IPAddress.Any, 0, listenOpts =>
-                {
                     // Who doesn't love to kick that old Nagle to the curb?
                     listenOpts.NoDelay = true;
 
@@ -465,7 +422,6 @@ namespace CitadelCore.Net.Proxy
             if (httpListenOptions != null)
             {
                 boundHttpEndpoint = httpListenOptions.IPEndPoint;
-                boundHttpsEndpoint = httpsListenOptions.IPEndPoint;
             }
             else
             {
