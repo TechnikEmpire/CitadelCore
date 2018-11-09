@@ -10,10 +10,10 @@ using CitadelCore.IO;
 using CitadelCore.Logging;
 using CitadelCore.Net.Http;
 using CitadelCore.Net.Proxy;
+using CitadelCore.Websockets.Managed;
 using Microsoft.AspNetCore.Http;
 using System;
 using System.Net.Http;
-using System.Net.WebSockets.Managed;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -63,7 +63,7 @@ namespace CitadelCore.Net.Handlers
             {
                 // First we need the URL for this connection, since it's been requested to be
                 // upgraded to a websocket.
-                var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
+                var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetEncodedUrl(context.Request);
 
                 // Need to replate the scheme with appropriate websocket scheme.
                 if (fullUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
@@ -130,6 +130,24 @@ namespace CitadelCore.Net.Handlers
                 // Connect the server websocket to the upstream, remote webserver.
                 await wsServer.ConnectAsync(wsUri, context.RequestAborted);
 
+                foreach (string key in wsServer.ResponseHeaders)
+                {
+                    if (!ForbiddenWsHeaders.IsForbidden(key))
+                    {
+                        try
+                        {   
+                            var value = wsServer.ResponseHeaders[key];
+                            context.Response.Headers[key] = wsServer.ResponseHeaders[key];                            
+                        }
+                        catch (Exception hdrException)
+                        {
+                            LoggerProxy.Default.Error(hdrException);
+                        }
+                    }
+                }
+
+                Console.WriteLine();
+                
                 // Create, via acceptor, the client websocket. This is the local machine's websocket.
                 wsClient = await context.WebSockets.AcceptWebSocketAsync(wsServer.SubProtocol ?? null);
                 

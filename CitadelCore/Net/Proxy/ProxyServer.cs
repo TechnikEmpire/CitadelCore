@@ -447,12 +447,7 @@ namespace CitadelCore.Net.Proxy
                 app.UseResponseCompression();
 
                 // We proxy websockets, so enable this.
-                var wsOpts = new WebSocketOptions
-                {
-                    ReceiveBufferSize = (int)(ushort.MaxValue * 5)
-                };
-
-                app.UseWebSockets(wsOpts);
+                app.UseWebSockets();
 
                 // Exception handler. Not yet sure what to do here.
                 app.UseExceptionHandler(
@@ -521,12 +516,7 @@ namespace CitadelCore.Net.Proxy
                 app.UseResponseCompression();
 
                 // We proxy websockets, so enable this.
-                var wsOpts = new WebSocketOptions
-                {
-                    ReceiveBufferSize = (int)(ushort.MaxValue * 5)
-                };
-
-                app.UseWebSockets(wsOpts);
+                app.UseWebSockets();
 
                 // Exception handler. Not yet sure what to do here.
                 app.UseExceptionHandler(

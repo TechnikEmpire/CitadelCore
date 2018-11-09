@@ -12,6 +12,7 @@ using CitadelCore.Util;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 
@@ -59,7 +60,7 @@ namespace CitadelCore.Extensions
                     if (message.Content != null)
                     {
                         if (message.Content.Headers.TryAddWithoutValidation(key, headers.GetValues(key)))
-                        {   
+                        {
                             clonedCollection.Remove(key);
                         }
                     }

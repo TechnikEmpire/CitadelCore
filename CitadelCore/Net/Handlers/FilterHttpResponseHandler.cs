@@ -13,6 +13,7 @@ using CitadelCore.Net.Http;
 using CitadelCore.Net.Proxy;
 using Microsoft.AspNetCore.Http;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -56,6 +57,23 @@ namespace CitadelCore.Net.Handlers
         /// new instances unnecessarily.
         /// </summary>
         private static readonly System.Collections.Generic.HashSet<string> s_emptyExemptedHeaders = new System.Collections.Generic.HashSet<string>();
+
+        static FilterHttpResponseHandler()
+        {
+            // Use reflection to enable us to send a content-type with GET messages and such,
+            // because Microsoft is ultra-strict with .NET, but breaks all the rules
+            // with everything else.
+            var invalidHeadersField = typeof(System.Net.Http.Headers.HttpRequestHeaders).GetField(
+                "invalidHeaders", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static) ?? 
+                typeof(System.Net.Http.Headers.HttpRequestHeaders).GetField("s_invalidHeaders", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+            if (invalidHeadersField != null)
+            {
+                var invalidHeadersCollection = (HashSet<string>)invalidHeadersField.GetValue(null);
+                invalidHeadersCollection.Remove("Content-Type");
+            }
+        }
 
         /// <summary>
         /// Constructs a FilterHttpResponseHandler instance.

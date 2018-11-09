@@ -37,6 +37,8 @@ namespace CitadelCore.Net.Http
             // Don't set the version for our client socket. Microsoft sets this all by themselves.
             "Sec-WebSocket-Version",
 
+            "Sec-WebSocket-Accept",
+
             // We manually add cookies so we don't want them this way.
             "Cookie",
 
