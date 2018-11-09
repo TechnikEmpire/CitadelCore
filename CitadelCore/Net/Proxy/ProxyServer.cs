@@ -173,30 +173,25 @@ namespace CitadelCore.Net.Proxy
                 }
 
                 // Create the public, v4 proxy.
-                IPEndPoint v4HttpEndpoint = null;
 
                 var publicV4Startup = new PublicServerStartup(null, _httpResponseFactory);
-                var publicV4Host = CreateHost<PublicServerStartup>(false, false, out v4HttpEndpoint, publicV4Startup);
+                var publicV4Host = CreateHost<PublicServerStartup>(false, false, out IPEndPoint v4HttpEndpoint, publicV4Startup);
 
                 V4HttpEndpoint = v4HttpEndpoint;
 
                 // Create the public, v6 proxy.
-                IPEndPoint v6HttpEndpoint = null;
 
                 var publicV6Startup = new PublicServerStartup(null, _httpResponseFactory);
-                var publicV6Host = CreateHost<PublicServerStartup>(false, true, out v6HttpEndpoint, publicV6Startup);
+                var publicV6Host = CreateHost<PublicServerStartup>(false, true, out IPEndPoint v6HttpEndpoint, publicV6Startup);
 
                 V6HttpEndpoint = v6HttpEndpoint;
 
                 // Create the private, v4 replay proxy
-                IPEndPoint privateV4HttpEndpoint = null;
-                IPEndPoint privateV4HttpsEndpoint = null;
-
                 var privateV4Startup = new PrivateServerStartup(null, _replayResponseFactory);
-                var privateV4Host = CreateHost<PrivateServerStartup>(true, false, out privateV4HttpEndpoint, privateV4Startup);
+                var privateV4Host = CreateHost<PrivateServerStartup>(true, false, out IPEndPoint privateV4HttpEndpoint, privateV4Startup);
 
                 _replayResponseFactory.V4HttpEndpoint = privateV4HttpEndpoint;
-                _replayResponseFactory.V4HttpsEndpoint = privateV4HttpsEndpoint;
+                _replayResponseFactory.V4HttpsEndpoint = privateV4HttpEndpoint;
 
                 _hosts = new List<IWebHost>()
                 {
@@ -456,7 +451,8 @@ namespace CitadelCore.Net.Proxy
                 {
                     ReceiveBufferSize = (int)(ushort.MaxValue * 5)
                 };
-                app.UseWebSockets();
+
+                app.UseWebSockets(wsOpts);
 
                 // Exception handler. Not yet sure what to do here.
                 app.UseExceptionHandler(
@@ -529,7 +525,8 @@ namespace CitadelCore.Net.Proxy
                 {
                     ReceiveBufferSize = (int)(ushort.MaxValue * 5)
                 };
-                app.UseWebSockets();
+
+                app.UseWebSockets(wsOpts);
 
                 // Exception handler. Not yet sure what to do here.
                 app.UseExceptionHandler(

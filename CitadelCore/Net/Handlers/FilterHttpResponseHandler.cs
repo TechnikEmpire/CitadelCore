@@ -45,7 +45,17 @@ namespace CitadelCore.Net.Handlers
         /// </summary>
         private readonly ReplayResponseHandlerFactory _replayFactory;
 
+        /// <summary>
+        /// Used to determine HTTP version from Kestrel string(s).
+        /// </summary>
         private static readonly Regex s_httpVerRegex = new Regex("([0-9]+\\.[0-9]+)", RegexOptions.Compiled | RegexOptions.ECMAScript);
+
+
+        /// <summary>
+        /// Used whenever the user does not supply an exempted headers list to us, in order to avoid creating
+        /// new instances unnecessarily.
+        /// </summary>
+        private static readonly System.Collections.Generic.HashSet<string> s_emptyExemptedHeaders = new System.Collections.Generic.HashSet<string>();
 
         /// <summary>
         /// Constructs a FilterHttpResponseHandler instance.
@@ -603,7 +613,7 @@ namespace CitadelCore.Net.Handlers
                     using (var responseStream = await response?.Content.ReadAsStreamAsync())
                     {
                         context.Response.StatusCode = (int)response.StatusCode;
-                        context.Response.PopulateHeaders(response.ExportAllHeaders(), new System.Collections.Generic.HashSet<string>());
+                        context.Response.PopulateHeaders(response.ExportAllHeaders(), s_emptyExemptedHeaders);
 
                         if (!responseHasZeroContentLength && (upstreamIsHttp1 || responseIsFixedLength))
                         {

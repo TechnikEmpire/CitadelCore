@@ -55,10 +55,10 @@ namespace CitadelCore.Net.Handlers
         /// The handling task.
         /// </returns>
         public override async Task Handle(HttpContext context)
-        {
+        {   
             ClientWebSocket wsServer = null;
             System.Net.WebSockets.WebSocket wsClient = null;
-
+            
             try
             {
                 // First we need the URL for this connection, since it's been requested to be
@@ -89,6 +89,26 @@ namespace CitadelCore.Net.Handlers
                 wsServer.Options.Cookies = new System.Net.CookieContainer();
                 wsServer.Options.SetBuffer((int)ushort.MaxValue * 16, (int)ushort.MaxValue * 16);
 
+                foreach (var proto in context.WebSockets.WebSocketRequestedProtocols)
+                {
+                    wsServer.Options.AddSubProtocol(proto);
+                }
+
+                foreach (var hdr in context.Request.Headers)
+                {
+                    if (!ForbiddenWsHeaders.IsForbidden(hdr.Key))
+                    {
+                        try
+                        {
+                            wsServer.Options.SetRequestHeader(hdr.Key, hdr.Value.ToString());
+                        }
+                        catch (Exception hdrException)
+                        {
+                            LoggerProxy.Default.Error(hdrException);
+                        }
+                    }
+                }
+
                 foreach (var cookie in context.Request.Cookies)
                 {
                     try
@@ -107,32 +127,12 @@ namespace CitadelCore.Net.Handlers
                     wsServer.Options.ClientCertificates = new System.Security.Cryptography.X509Certificates.X509CertificateCollection(new[] { context.Connection.ClientCertificate.ToV2Certificate() });
                 }
 
-                var reqHeaderBuilder = new StringBuilder();
-                foreach (var hdr in context.Request.Headers)
-                {
-                    if (!ForbiddenWsHeaders.IsForbidden(hdr.Key))
-                    {
-                        reqHeaderBuilder.AppendFormat("{0}: {1}\r\n", hdr.Key, hdr.Value.ToString());
-
-                        try
-                        {
-                            wsServer.Options.SetRequestHeader(hdr.Key, hdr.Value.ToString());
-                        }
-                        catch (Exception hdrException)
-                        {
-                            LoggerProxy.Default.Error(hdrException);
-                        }
-                    }
-                }
-
-                reqHeaderBuilder.Append("\r\n");
-
                 // Connect the server websocket to the upstream, remote webserver.
                 await wsServer.ConnectAsync(wsUri, context.RequestAborted);
 
                 // Create, via acceptor, the client websocket. This is the local machine's websocket.
                 wsClient = await context.WebSockets.AcceptWebSocketAsync(wsServer.SubProtocol ?? null);
-
+                
                 // Match the HTTP version of the client on the upstream request. We don't want to
                 // transparently pass around headers that are wrong for the client's HTTP version.
                 Version upstreamReqVersionMatch = null;

@@ -12,13 +12,13 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/TechnikEmpire/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Now dynamically handles HTTPS and HTTP streams on a single bound port. Clients no longer need to guess if a non-standard port connection is HTTP or HTTPS, the engine will figure this out itself.</PackageReleaseNotes>
+    <PackageReleaseNotes>Fixes an issue in correctly handling websockets.</PackageReleaseNotes>
     <Title>CitadelCore</Title>
     <Summary>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Summary>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>3.7.0</Version>
-    <AssemblyVersion>3.7.0.0</AssemblyVersion>
-    <FileVersion>3.7.0.0</FileVersion>    
+    <Version>3.7.1</Version>
+    <AssemblyVersion>3.7.1.0</AssemblyVersion>
+    <FileVersion>3.7.1.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">
@@ -39,27 +39,91 @@
   </Target>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DocumentationFile>bin\Debug\netstandard2.0\CitadelCore.xml</DocumentationFile>
     <DefineConstants>TRACE;DEBUG;VERBOSE_WARNINGS</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DocumentationFile>bin\Release\netstandard2.0\CitadelCore.xml</DocumentationFile>
     <DefineConstants>TRACE;RELEASE;NETSTANDARD2_0</DefineConstants>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Contrib\**" />
+    <Compile Remove="Websockets\**" />
+    <EmbeddedResource Remove="Contrib\**" />
+    <EmbeddedResource Remove="Websockets\**" />
+    <None Remove="Contrib\**" />
+    <None Remove="Websockets\**" />
+  </ItemGroup>
   
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics" Version="2.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.ResponseCompression" Version="2.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.1.3" />
     <PackageReference Include="Microsoft.AspNetCore.WebSockets.Server" Version="0.1.0" />
-    <PackageReference Include="Portable.BouncyCastle" Version="1.8.3" />
+    <PackageReference Include="Portable.BouncyCastle" Version="1.8.4" />
     <PackageReference Include="StreamExtended" Version="[1.0.81]" />
     <PackageReference Include="System.Memory" Version="4.5.1" />
-    <PackageReference Include="System.Net.WebSockets.Client.Managed" Version="1.0.22" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="$(ProjectDir)..\Contrib\System.Net.Websockets.Client.Managed\System.Net.WebSockets.Client.Managed\ClientWebSocket.cs">
+      <Link>ManagedWebsockets\ClientWebSocket.cs</Link>
+    </Compile>
+    <Compile Include="$(ProjectDir)..\Contrib\System.Net.Websockets.Client.Managed\System.Net.WebSockets.Client.Managed\ClientWebSocketOptions.cs">
+      <Link>ManagedWebsockets\ClientWebSocketOptions.cs</Link>
+    </Compile>
+    <Compile Include="$(ProjectDir)..\Contrib\System.Net.Websockets.Client.Managed\System.Net.WebSockets.Client.Managed\HttpKnownHeaderNames.cs">
+      <Link>ManagedWebsockets\HttpKnownHeaderNames.cs</Link>
+    </Compile>
+    <Compile Include="$(ProjectDir)..\Contrib\System.Net.Websockets.Client.Managed\System.Net.WebSockets.Client.Managed\ManagedWebSocket.cs">
+      <Link>ManagedWebsockets\ManagedWebSocket.cs</Link>
+    </Compile>
+    <Compile Include="$(ProjectDir)..\Contrib\System.Net.Websockets.Client.Managed\System.Net.WebSockets.Client.Managed\NET45Shims.cs">
+      <Link>ManagedWebsockets\NET45Shims.cs</Link>
+    </Compile>
+    <Compile Include="$(ProjectDir)..\Contrib\System.Net.Websockets.Client.Managed\System.Net.WebSockets.Client.Managed\NetEventSource.WebSockets.cs">
+      <Link>ManagedWebsockets\NetEventSource.WebSockets.cs</Link>
+    </Compile>
+    <Compile Include="$(ProjectDir)..\Contrib\System.Net.Websockets.Client.Managed\System.Net.WebSockets.Client.Managed\SecurityProtocol.cs">
+      <Link>ManagedWebsockets\SecurityProtocol.cs</Link>
+    </Compile>
+    <Compile Include="$(ProjectDir)..\Contrib\System.Net.Websockets.Client.Managed\System.Net.WebSockets.Client.Managed\SR.cs">
+      <Link>ManagedWebsockets\SR.cs</Link>
+    </Compile>
+    <Compile Include="$(ProjectDir)..\Contrib\System.Net.Websockets.Client.Managed\System.Net.WebSockets.Client.Managed\StringExtensions.cs">
+      <Link>ManagedWebsockets\StringExtensions.cs</Link>
+    </Compile>
+    <Compile Include="$(ProjectDir)..\Contrib\System.Net.Websockets.Client.Managed\System.Net.WebSockets.Client.Managed\SystemClientWebSocket.cs">
+      <Link>ManagedWebsockets\SystemClientWebSocket.cs</Link>
+    </Compile>
+    <Compile Include="$(ProjectDir)..\Contrib\System.Net.Websockets.Client.Managed\System.Net.WebSockets.Client.Managed\UriScheme.cs">
+      <Link>ManagedWebsockets\UriScheme.cs</Link>
+    </Compile>
+    <Compile Include="$(ProjectDir)..\Contrib\System.Net.Websockets.Client.Managed\System.Net.WebSockets.Client.Managed\WebSocketHandle.Managed.cs">
+      <Link>ManagedWebsockets\WebSocketHandle.Managed.cs</Link>
+    </Compile>
+    <Compile Include="$(ProjectDir)..\Contrib\System.Net.Websockets.Client.Managed\System.Net.WebSockets.Client.Managed\WebSocketValidate.cs">
+      <Link>ManagedWebsockets\WebSocketValidate.cs</Link>
+    </Compile>
+  </ItemGroup>
 
+  <ItemGroup>
+    <Compile Update="Strings.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Strings.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Strings.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Strings.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+  
 </Project>
