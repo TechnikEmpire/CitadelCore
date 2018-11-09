@@ -1,4 +1,0 @@
-[submodule "Contrib\\System.Net.WebSockets.Client.Managed"]
-	path = Contrib\\System.Net.WebSockets.Client.Managed
-	url = https://github.com/PingmanTools/System.Net.WebSockets.Client.Managed.git
-	ignore = dirty

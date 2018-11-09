@@ -12,13 +12,13 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/TechnikEmpire/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Fixes an issue in correctly handling websockets.</PackageReleaseNotes>
+    <PackageReleaseNotes>Re-externalizes managed websockets.</PackageReleaseNotes>
     <Title>CitadelCore</Title>
     <Summary>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Summary>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>3.7.1</Version>
-    <AssemblyVersion>3.7.1.0</AssemblyVersion>
-    <FileVersion>3.7.1.0</FileVersion>    
+    <Version>3.7.2</Version>
+    <AssemblyVersion>3.7.2.0</AssemblyVersion>
+    <FileVersion>3.7.2.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">
@@ -67,8 +67,10 @@
     <PackageReference Include="Portable.BouncyCastle" Version="1.8.4" />
     <PackageReference Include="StreamExtended" Version="[1.0.81]" />
     <PackageReference Include="System.Memory" Version="4.5.1" />
+    <PackageReference Include="System.Net.WebSockets.Client.Managed" Version="1.0.22" />
   </ItemGroup>
 
+  <!-- If you want to bundle the websocket lib internally!
   <ItemGroup>
     <Compile Include="$(ProjectDir)..\Contrib\System.Net.Websockets.Client.Managed\System.Net.WebSockets.Client.Managed\ClientWebSocket.cs">
       <Link>ManagedWebsockets\ClientWebSocket.cs</Link>
@@ -125,5 +127,6 @@
       <LastGenOutput>Strings.Designer.cs</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
+  -->
   
 </Project>
