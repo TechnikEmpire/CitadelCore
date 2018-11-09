@@ -1,4 +1,4 @@
-[submodule "CitadelCore/Contrib/System.Net.Websockets.Client.Managed"]
-	path = CitadelCore/Contrib/System.Net.Websockets.Client.Managed
+[submodule "Contrib/System.Net.Websockets.Client.Managed"]
+	path = Contrib/System.Net.Websockets.Client.Managed
 	url = https://github.com/PingmanTools/System.Net.WebSockets.Client.Managed.git
 	ignore = dirty
