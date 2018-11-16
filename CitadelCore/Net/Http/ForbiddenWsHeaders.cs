@@ -23,8 +23,15 @@ namespace CitadelCore.Net.Http
             // imported from ForbiddenHttpHeaders.
             "X-SDHC",
             "Avail-Dictionary",
+            "Content-Length",
+            "Content-Encoding",
+            "Alternate-Protocol",
+            "Alt-Svc",
             "Public-Key-Pins",
             "Public-Key-Pins-Report-Only",
+            "Get-Dictionary",
+            "Accept-Encoding",
+            "Transfer-Encoding",
 
             // Our client websocket might not be the same as our server websocket. In .NET Standard
             // 2.0 for example, the Kestrel client websocket is a completely different class than the

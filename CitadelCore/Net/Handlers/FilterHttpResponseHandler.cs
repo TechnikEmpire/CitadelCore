@@ -118,7 +118,7 @@ namespace CitadelCore.Net.Handlers
             try
             {
                 // Use helper to get the full, proper URL for the request. var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
-                var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetEncodedUrl(context.Request);
+                var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
 
                 // Next we need to try and parse the URL as a URI, because the web client requires
                 // this for connecting upstream.
@@ -596,7 +596,7 @@ namespace CitadelCore.Net.Handlers
                                             }
                                         };
 
-                                        // We have a body and the user wants to just stream-inspect it.
+                                        // We have a body and the user wants to just stream-inspect it via replay.
                                         using (var wrappedStream = new InspectionStream(responseMessageNfo, responseStream))
                                         {
                                             wrappedStream.StreamRead = (InspectionStream stream, Memory<byte> buffer, out bool dropConnection) =>
@@ -615,7 +615,7 @@ namespace CitadelCore.Net.Handlers
                                                 replay.BodyComplete = true;
                                             };
 
-                                            _configuration.HttpMessageReplayInspectionCallback?.Invoke(replay.ReplayUrl, cancellationFunction);
+                                            _configuration.HttpMessageReplayInspectionCallback?.Invoke(responseMessageNfo, replay.ReplayUrl, cancellationFunction);
 
                                             await Microsoft.AspNetCore.Http.Extensions.StreamCopyOperation.CopyToAsync(wrappedStream, context.Response.Body, null, context.RequestAborted);
                                         }

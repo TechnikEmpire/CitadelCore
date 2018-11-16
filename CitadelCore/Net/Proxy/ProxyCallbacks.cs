@@ -9,7 +9,6 @@ using CitadelCore.IO;
 using CitadelCore.Net.Http;
 using Microsoft.AspNetCore.Http;
 using System;
-using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace CitadelCore.Net.Proxy
@@ -77,6 +76,9 @@ namespace CitadelCore.Net.Proxy
     /// <summary>
     /// Delegate for receiving a response to a replay inspection request.
     /// </summary>
+    /// <param name="messageInfo">
+    /// The message info of the source stream being replayed.
+    /// </param>
     /// <param name="replayUrl">
     /// The replay URL to connect to in order to receive an exact replay of the source data HTTP
     /// response. Note that presently, only HTTP responses are supported.
@@ -96,7 +98,7 @@ namespace CitadelCore.Net.Proxy
     ///
     /// For more information, see the remarks on <seealso cref="ProxyNextAction.AllowButRequestResponseReplay" />.
     /// </remarks>
-    public delegate void HttpMessageReplayInspectionHandler(string replayUrl, HttpReplayTerminationCallback cancellationCallback);
+    public delegate void HttpMessageReplayInspectionHandler(HttpMessageInfo messageInfo, string replayUrl, HttpReplayTerminationCallback cancellationCallback);
 
     /// <summary>
     /// Delegate for delegating request/response handling to the library user.

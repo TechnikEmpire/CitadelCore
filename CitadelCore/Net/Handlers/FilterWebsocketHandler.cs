@@ -63,7 +63,7 @@ namespace CitadelCore.Net.Handlers
             {
                 // First we need the URL for this connection, since it's been requested to be
                 // upgraded to a websocket.
-                var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetEncodedUrl(context.Request);
+                var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
 
                 // Need to replate the scheme with appropriate websocket scheme.
                 if (fullUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
@@ -87,7 +87,7 @@ namespace CitadelCore.Net.Handlers
                 // Create the websocket that's going to connect to the remote server.
                 wsServer = new ClientWebSocket();
                 wsServer.Options.Cookies = new System.Net.CookieContainer();
-                wsServer.Options.SetBuffer((int)ushort.MaxValue * 16, (int)ushort.MaxValue * 16);
+                //wsServer.Options.SetBuffer((int)ushort.MaxValue * 16, (int)ushort.MaxValue * 16);
 
                 foreach (var proto in context.WebSockets.WebSocketRequestedProtocols)
                 {
@@ -145,8 +145,6 @@ namespace CitadelCore.Net.Handlers
                         }
                     }
                 }
-
-                Console.WriteLine();
                 
                 // Create, via acceptor, the client websocket. This is the local machine's websocket.
                 wsClient = await context.WebSockets.AcceptWebSocketAsync(wsServer.SubProtocol ?? null);
@@ -214,8 +212,9 @@ namespace CitadelCore.Net.Handlers
 
                         await wsClient.CloseAsync(serverStatus.CloseStatus.Value, serverStatus.CloseStatusDescription, context.RequestAborted);
                     }
-                    catch
+                    catch (Exception err)
                     {
+                        LoggerProxy.Default.Error(err);
                         try
                         {
                             var closeStatus = serverStatus?.CloseStatus ?? System.Net.WebSockets.WebSocketCloseStatus.NormalClosure;
@@ -254,8 +253,9 @@ namespace CitadelCore.Net.Handlers
 
                         await wsServer.CloseAsync(clientResult.CloseStatus.Value, clientResult.CloseStatusDescription, context.RequestAborted);
                     }
-                    catch
+                    catch(Exception err)
                     {
+                        LoggerProxy.Default.Error(err);
                         try
                         {
                             var closeStatus = clientResult?.CloseStatus ?? System.Net.WebSockets.WebSocketCloseStatus.NormalClosure;
