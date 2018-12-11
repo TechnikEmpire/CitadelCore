@@ -12,14 +12,23 @@
     <PackageIconUrl />
     <RepositoryUrl>https://github.com/TechnikEmpire/CitadelCore</RepositoryUrl>
     <PackageTags>proxy filtering content-filtering transparent-proxy</PackageTags>
-    <PackageReleaseNotes>Includes originating message info in replay callback. This is a breaking API change, so version is bumped to 4.x.
-Fixes an issue where websockets were malfunctioning as a result of the new websocket fork work.</PackageReleaseNotes>
+    <PackageReleaseNotes>Upgrades core deps.
+Enables HTTP/2 on the proxy front-end, but backend fulfillment is still HTTP/1.x.
+Strips all compression methods from the front end.
+Configures Kestrel for optimal throughput.
+Ensures that headers are replaced if they exist. This ensures that client changes always apply.
+Removes arbitrary limits, such as max length on request strings.
+Fixes an issue where ASP.NET Core incorrectly decodes some URL's, which causes some things to randomly fail as bad requests. Google maps is an example of what suffered in previous versions.
+Now builds out the full URL based on the raw values sent by the browser. This applies to websockets as well.
+Adds the ability to inspect individual websocket messages.
+Fixes an issue where the whole body inspection callback was invoked on websockets even if not requested.
+Everything is now extremely fast, and stable. No more public changes or additions will be made.</PackageReleaseNotes>
     <Title>CitadelCore</Title>
     <Summary>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Summary>
     <Description>Transparent filtering HTTP/S and Websocket/WebsocketSecure proxy.</Description>
-    <Version>4.0.1</Version>
-    <AssemblyVersion>4.0.1.0</AssemblyVersion>
-    <FileVersion>4.0.1.0</FileVersion>    
+    <Version>4.2.3</Version>
+    <AssemblyVersion>4.2.3.0</AssemblyVersion>
+    <FileVersion>4.2.3.0</FileVersion>    
   </PropertyGroup>
 
   <ItemGroup Label="dotnet pack instructions">
@@ -62,9 +71,8 @@ Fixes an issue where websockets were malfunctioning as a result of the new webso
   
   <ItemGroup>
     <PackageReference Include="CitadelCore.Websockets.Client.Managed" Version="1.1.1" />
-    <PackageReference Include="Microsoft.AspNetCore.Diagnostics" Version="2.1.1" />
-    <PackageReference Include="Microsoft.AspNetCore.ResponseCompression" Version="2.1.1" />
-    <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.1.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Diagnostics" Version="2.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.WebSockets.Server" Version="0.1.0" />
     <PackageReference Include="Portable.BouncyCastle" Version="1.8.4" />
     <PackageReference Include="StreamExtended" Version="[1.0.81]" />

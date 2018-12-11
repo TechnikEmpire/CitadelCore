@@ -54,6 +54,11 @@ namespace CitadelCore.Extensions
 
                 try
                 {
+                    if (message.Headers.ContainsKey(key))
+                    {
+                        message.Headers.Remove(key);
+                    }
+
                     message.Headers.Add(key, new Microsoft.Extensions.Primitives.StringValues(headers.GetValues(key)));
                     clonedCollection.Remove(key);
                 }

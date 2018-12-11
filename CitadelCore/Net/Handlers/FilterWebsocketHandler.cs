@@ -10,8 +10,10 @@ using CitadelCore.IO;
 using CitadelCore.Logging;
 using CitadelCore.Net.Http;
 using CitadelCore.Net.Proxy;
+using CitadelCore.Util;
 using CitadelCore.Websockets.Managed;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using System;
 using System.Net.Http;
 using System.Text;
@@ -29,6 +31,10 @@ namespace CitadelCore.Net.Handlers
     internal class FilterWebsocketHandler : AbstractFilterResponseHandler
     {
         private static readonly Regex s_httpVerRegex = new Regex("([0-9]+\\.[0-9]+)", RegexOptions.Compiled | RegexOptions.ECMAScript);
+
+        private static readonly string s_octetStreamContentType = "application/octet-stream";
+
+        private static readonly string s_plainTextContentType = "text/plain";
 
         /// <summary>
         /// Constructs a FilterWebsocketHandler instance.
@@ -63,7 +69,19 @@ namespace CitadelCore.Net.Handlers
             {
                 // First we need the URL for this connection, since it's been requested to be
                 // upgraded to a websocket.
-                var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
+
+                var connFeature = context.Features.Get<IHttpRequestFeature>();
+
+                string fullUrl = string.Empty;
+
+                if (connFeature != null && connFeature.RawTarget != null && !string.IsNullOrEmpty(connFeature.RawTarget) && !(string.IsNullOrWhiteSpace(connFeature.RawTarget)))
+                {
+                    fullUrl = $"{context.Request.Scheme}://{context.Request.Host}{connFeature.RawTarget}";
+                }
+                else
+                {
+                    fullUrl = $"{context.Request.Scheme}://{context.Request.Host}{context.Request.Path}{context.Request.QueryString}";
+                }
 
                 // Need to replate the scheme with appropriate websocket scheme.
                 if (fullUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
@@ -88,7 +106,7 @@ namespace CitadelCore.Net.Handlers
                 wsServer = new ClientWebSocket();
                 wsServer.Options.Cookies = new System.Net.CookieContainer();
                 //wsServer.Options.SetBuffer((int)ushort.MaxValue * 16, (int)ushort.MaxValue * 16);
-
+                
                 foreach (var proto in context.WebSockets.WebSocketRequestedProtocols)
                 {
                     wsServer.Options.AddSubProtocol(proto);
@@ -185,40 +203,119 @@ namespace CitadelCore.Net.Handlers
                         }
                 }
 
+                var serverMessageInfo = new HttpMessageInfo
+                {
+                    Url = wsUri,
+                    MessageId = msgNfo.MessageId,
+                    Method = new HttpMethod(context.Request.Method),
+                    IsEncrypted = context.Request.IsHttps,
+                    Headers = context.Request.Headers.ToNameValueCollection(),
+                    HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
+                    MessageProtocol = MessageProtocol.WebSocket,
+                    MessageType = MessageType.Response,
+                    RemoteAddress = context.Connection.RemoteIpAddress,
+                    RemotePort = (ushort)context.Connection.RemotePort,
+                    LocalAddress = context.Connection.LocalIpAddress,
+                    LocalPort = (ushort)context.Connection.LocalPort
+                };
+
+                var clientMessageInfo = new HttpMessageInfo
+                {
+                    Url = wsUri,
+                    MessageId = msgNfo.MessageId,
+                    IsEncrypted = context.Request.IsHttps,
+                    Headers = context.Request.Headers.ToNameValueCollection(),
+                    HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
+                    MessageProtocol = MessageProtocol.WebSocket,
+                    MessageType = MessageType.Request,
+                    RemoteAddress = context.Connection.RemoteIpAddress,
+                    RemotePort = (ushort)context.Connection.RemotePort,
+                    LocalAddress = context.Connection.LocalIpAddress,
+                    LocalPort = (ushort)context.Connection.LocalPort
+                };
+
+                bool inspect = true;
+
+                switch (msgNfo.ProxyNextAction)
+                {
+                    case ProxyNextAction.AllowAndIgnoreContent:
+                    case ProxyNextAction.AllowAndIgnoreContentAndResponse:
+                        {
+                            inspect = false;
+                        }
+                        break;
+                }
+
                 // Spawn an async task that will poll the remote server for data in a loop, and then
                 // write any data it gets to the client websocket.
                 var serverTask = Task.Run(async () =>
                 {
-                    System.Net.WebSockets.WebSocketReceiveResult serverStatus = null;
+                    System.Net.WebSockets.WebSocketReceiveResult serverResult = null;
                     var serverBuffer = new byte[1024 * 4];
                     try
                     {
                         bool looping = true;
 
-                        serverStatus = await wsServer.ReceiveAsync(new ArraySegment<byte>(serverBuffer), context.RequestAborted);
+                        serverResult = await wsServer.ReceiveAsync(new ArraySegment<byte>(serverBuffer), context.RequestAborted);
 
-                        while (looping && !serverStatus.CloseStatus.HasValue && !context.RequestAborted.IsCancellationRequested)
+                        while (looping && !serverResult.CloseStatus.HasValue && !context.RequestAborted.IsCancellationRequested)
                         {
-                            await wsClient.SendAsync(new ArraySegment<byte>(serverBuffer, 0, serverStatus.Count), serverStatus.MessageType, serverStatus.EndOfMessage, context.RequestAborted);
 
-                            if (!wsClient.CloseStatus.HasValue)
+                            if (inspect)
                             {
-                                serverStatus = await wsServer.ReceiveAsync(new ArraySegment<byte>(serverBuffer), context.RequestAborted);
-                                continue;
+                                serverMessageInfo.Body = new Memory<byte>(serverBuffer, 0, serverResult.Count);
+
+                                switch (serverResult.MessageType)
+                                {
+                                    case System.Net.WebSockets.WebSocketMessageType.Binary:
+                                        {
+                                            serverMessageInfo.BodyContentType = s_octetStreamContentType;
+                                        }
+                                        break;
+
+                                    case System.Net.WebSockets.WebSocketMessageType.Text:
+                                        {
+                                            serverMessageInfo.BodyContentType = s_plainTextContentType;
+                                        }
+                                        break;
+                                }
+
+                                _configuration.HttpMessageWholeBodyInspectionHandler?.Invoke(serverMessageInfo);
+                            }
+
+                            switch (serverMessageInfo.ProxyNextAction)
+                            {
+                                case ProxyNextAction.DropConnection:
+                                    {
+                                        looping = false;
+                                    }
+                                    break;
+
+                                default:
+                                    {
+                                        await wsClient.SendAsync(new ArraySegment<byte>(serverBuffer, 0, serverResult.Count), serverResult.MessageType, serverResult.EndOfMessage, context.RequestAborted);
+
+                                        if (!wsClient.CloseStatus.HasValue)
+                                        {
+                                            serverResult = await wsServer.ReceiveAsync(new ArraySegment<byte>(serverBuffer), context.RequestAborted);
+                                            continue;
+                                        }
+                                    }
+                                    break;
                             }
 
                             looping = false;
                         }
 
-                        await wsClient.CloseAsync(serverStatus.CloseStatus.Value, serverStatus.CloseStatusDescription, context.RequestAborted);
+                        await wsClient.CloseAsync(serverResult.CloseStatus.Value, serverResult.CloseStatusDescription, context.RequestAborted);
                     }
                     catch (Exception err)
                     {
                         LoggerProxy.Default.Error(err);
                         try
                         {
-                            var closeStatus = serverStatus?.CloseStatus ?? System.Net.WebSockets.WebSocketCloseStatus.NormalClosure;
-                            var closeMessage = serverStatus?.CloseStatusDescription ?? string.Empty;
+                            var closeStatus = serverResult?.CloseStatus ?? System.Net.WebSockets.WebSocketCloseStatus.NormalClosure;
+                            var closeMessage = serverResult?.CloseStatusDescription ?? string.Empty;
 
                             await wsClient.CloseAsync(closeStatus, closeMessage, context.RequestAborted);
                         }
@@ -240,12 +337,47 @@ namespace CitadelCore.Net.Handlers
 
                         while (looping && !clientResult.CloseStatus.HasValue && !context.RequestAborted.IsCancellationRequested)
                         {
-                            await wsServer.SendAsync(new ArraySegment<byte>(clientBuffer, 0, clientResult.Count), clientResult.MessageType, clientResult.EndOfMessage, context.RequestAborted);
-
-                            if (!wsServer.CloseStatus.HasValue)
+                            if (inspect)
                             {
-                                clientResult = await wsClient.ReceiveAsync(new ArraySegment<byte>(clientBuffer), context.RequestAborted);
-                                continue;
+                                clientMessageInfo.Body = new Memory<byte>(clientBuffer, 0, clientResult.Count);
+
+                                switch (clientResult.MessageType)
+                                {
+                                    case System.Net.WebSockets.WebSocketMessageType.Binary:
+                                        {
+                                            clientMessageInfo.BodyContentType = s_octetStreamContentType;
+                                        }
+                                        break;
+
+                                    case System.Net.WebSockets.WebSocketMessageType.Text:
+                                        {
+                                            clientMessageInfo.BodyContentType = s_plainTextContentType;
+                                        }
+                                        break;
+                                }
+
+                                _configuration.HttpMessageWholeBodyInspectionHandler?.Invoke(clientMessageInfo);
+                            }
+
+                            switch (clientMessageInfo.ProxyNextAction)
+                            {
+                                case ProxyNextAction.DropConnection:
+                                    {
+                                        looping = false;
+                                    }
+                                    break;
+
+                                default:
+                                    {
+                                        await wsServer.SendAsync(new ArraySegment<byte>(clientBuffer, 0, clientResult.Count), clientResult.MessageType, clientResult.EndOfMessage, context.RequestAborted);
+
+                                        if (!wsServer.CloseStatus.HasValue)
+                                        {
+                                            clientResult = await wsClient.ReceiveAsync(new ArraySegment<byte>(clientBuffer), context.RequestAborted);
+                                            continue;
+                                        }
+                                    }
+                                    break;
                             }
 
                             looping = false;

@@ -11,14 +11,18 @@ using CitadelCore.Logging;
 using CitadelCore.Net.Handlers.Replay;
 using CitadelCore.Net.Http;
 using CitadelCore.Net.Proxy;
+using CitadelCore.Util;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace CitadelCore.Net.Handlers
 {
@@ -114,15 +118,27 @@ namespace CitadelCore.Net.Handlers
             HttpRequestMessage requestMsg = null;
 
             HttpClient upstreamClient = _client;
-
+            
             try
             {
                 // Use helper to get the full, proper URL for the request. var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
-                var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
+                //var fullUrl = Microsoft.AspNetCore.Http.Extensions.UriHelper.GetDisplayUrl(context.Request);
+
+                var connFeature = context.Features.Get<IHttpRequestFeature>();
+
+                string fullUrl = string.Empty;
+
+                if (connFeature != null && connFeature.RawTarget != null && !string.IsNullOrEmpty(connFeature.RawTarget) && !(string.IsNullOrWhiteSpace(connFeature.RawTarget)))
+                {
+                    fullUrl = $"{context.Request.Scheme}://{context.Request.Host}{connFeature.RawTarget}";
+                }
+                else
+                {
+                    fullUrl = $"{context.Request.Scheme}://{context.Request.Host}{context.Request.Path}{context.Request.QueryString}";
+                }
 
                 // Next we need to try and parse the URL as a URI, because the web client requires
                 // this for connecting upstream.
-
                 if (!Uri.TryCreate(fullUrl, UriKind.RelativeOrAbsolute, out Uri reqUrl))
                 {
                     LoggerProxy.Default.Error("Failed to parse HTTP URL.");
@@ -197,12 +213,17 @@ namespace CitadelCore.Net.Handlers
 
                 // Create the message AFTER we give the user a chance to alter things.
                 requestMsg = new HttpRequestMessage(requestMessageNfo.Method, requestMessageNfo.Url);
+
                 var initialFailedHeaders = requestMsg.PopulateHeaders(requestMessageNfo.Headers, requestMessageNfo.ExemptedHeaders);
 
                 // Ensure that we match the protocol of the client!
                 if (upstreamReqVersionMatch != null)
                 {
-                    requestMsg.Version = upstreamReqVersionMatch;
+                    // Upstream won't have HTTP/2 support on all OS versions!
+                    if (upstreamReqVersionMatch.Major <= 1)
+                    {
+                        requestMsg.Version = upstreamReqVersionMatch;
+                    }
                 }
 
                 // Check if we have a request body.
@@ -356,7 +377,7 @@ namespace CitadelCore.Net.Handlers
                 try
                 {
                     try
-                    {
+                    {   
                         response = await upstreamClient.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
                     }
                     catch (Exception e)

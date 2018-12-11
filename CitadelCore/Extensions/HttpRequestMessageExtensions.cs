@@ -50,7 +50,12 @@ namespace CitadelCore.Extensions
                 {
                     continue;
                 }
-                
+
+                if (message.Headers.Contains(key))
+                {
+                    message.Headers.Remove(key);
+                }
+
                 if (message.Headers.TryAddWithoutValidation(key, headers.GetValues(key)))
                 {   
                     clonedCollection.Remove(key);
@@ -59,6 +64,11 @@ namespace CitadelCore.Extensions
                 {
                     if (message.Content != null)
                     {
+                        if (message.Content.Headers.Contains(key))
+                        {
+                            message.Content.Headers.Remove(key);
+                        }
+
                         if (message.Content.Headers.TryAddWithoutValidation(key, headers.GetValues(key)))
                         {
                             clonedCollection.Remove(key);

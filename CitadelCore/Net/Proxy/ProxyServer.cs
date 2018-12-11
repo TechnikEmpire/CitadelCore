@@ -358,16 +358,22 @@ namespace CitadelCore.Net.Proxy
 
             ipWebhostBuilder.UseSockets(opts =>
             {
-                opts.IOQueueCount = 0;
+                //opts.IOQueueCount = 0;
+                opts.IOQueueCount = byte.MaxValue;
             });
 
             // Use Kestrel server.
             ipWebhostBuilder.UseKestrel(opts =>
             {
                 opts.Limits.MaxRequestBodySize = null;
-                opts.Limits.MaxRequestBufferSize = null;
                 opts.Limits.MaxConcurrentConnections = null;
                 opts.Limits.MaxConcurrentUpgradedConnections = null;
+                opts.Limits.MaxRequestLineSize = ushort.MaxValue;
+                opts.Limits.MaxResponseBufferSize = ushort.MaxValue * byte.MaxValue;
+                opts.Limits.MinResponseDataRate = null; //new MinDataRate(ushort.MaxValue * 10, TimeSpan.FromSeconds(30));
+                opts.AddServerHeader = false;
+                opts.ApplicationSchedulingMode = Microsoft.AspNetCore.Server.Kestrel.Transport.Abstractions.Internal.SchedulingMode.Inline;
+                opts.AllowSynchronousIO = true;
 
                 // Listen for HTTPS connections. Keep a reference to the options object so we can get
                 // the chosen port number after we call start.
@@ -383,7 +389,7 @@ namespace CitadelCore.Net.Proxy
                     // HTTP 2 got cut last minute from 2.1 and MS speculates that it may take several
                     // releases to get it properly included.
                     // https://github.com/aspnet/Docs/issues/5242#issuecomment-380863456
-                    // listenOpts.Protocols = HttpProtocols.Http1;
+                    listenOpts.Protocols = HttpProtocols.Http1AndHttp2;
 
                     httpListenOptions = listenOpts;
                 });
@@ -393,7 +399,7 @@ namespace CitadelCore.Net.Proxy
             ipWebhostBuilder.ConfigureServices(serviceOpts =>
             {
                 startupInsance.ConfigureServices(serviceOpts);
-                serviceOpts.AddResponseCompression();
+                //serviceOpts.AddResponseCompression();
 
                 // Add existing startup instance! This is how/where we handle connections.
                 serviceOpts.AddSingleton<IStartup>(startupInsance);
@@ -402,7 +408,7 @@ namespace CitadelCore.Net.Proxy
             ipWebhostBuilder.Configure(cfgApp =>
             {
                 startupInsance.Configure(cfgApp);
-                cfgApp.UseResponseCompression();
+                //cfgApp.UseResponseCompression();
             });
 
             // Build host. You needed this comment.
@@ -444,7 +450,7 @@ namespace CitadelCore.Net.Proxy
 
             public void Configure(IApplicationBuilder app)
             {
-                app.UseResponseCompression();
+                //app.UseResponseCompression();
 
                 // We proxy websockets, so enable this.
                 app.UseWebSockets();
@@ -513,7 +519,7 @@ namespace CitadelCore.Net.Proxy
 
             public void Configure(IApplicationBuilder app)
             {
-                app.UseResponseCompression();
+                //app.UseResponseCompression();
 
                 // We proxy websockets, so enable this.
                 app.UseWebSockets();
