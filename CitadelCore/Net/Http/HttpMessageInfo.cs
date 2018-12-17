@@ -132,7 +132,7 @@ namespace CitadelCore.Net.Http
         {
             get;
             internal set;
-        } = null;
+        } = new NameValueCollection();
 
         /// <summary>
         /// Gets or sets the body content type.
@@ -355,7 +355,7 @@ namespace CitadelCore.Net.Http
         {
             StatusCode = HttpStatusCode.Redirect;
             MessageType = MessageType.Response;
-            Headers.Clear();
+            Headers?.Clear();
             BodyContentType = string.Empty;
 
             if (_body != null && _body.Length > 0)
@@ -365,8 +365,11 @@ namespace CitadelCore.Net.Http
 
             Body = new Memory<byte>();
 
-            Headers["Expires"] = TimeUtil.UnixEpochString;
-            Headers["Location"] = location;
+            if (Headers != null)
+            {
+                Headers["Expires"] = TimeUtil.UnixEpochString;
+                Headers["Location"] = location;
+            }
         }
 
         /// <summary>

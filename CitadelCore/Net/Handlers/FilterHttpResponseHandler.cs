@@ -431,7 +431,7 @@ namespace CitadelCore.Net.Handlers
                             MessageId = requestMessageNfo.MessageId,
                             BodyContentType = response?.Content?.Headers?.ContentType?.ToString() ?? string.Empty,
                             IsEncrypted = context.Request.IsHttps,
-                            Headers = response.ExportAllHeaders(),
+                            Headers = responseHeaders,
                             MessageProtocol = MessageProtocol.Http,
                             HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
                             StatusCode = response.StatusCode,
@@ -483,7 +483,7 @@ namespace CitadelCore.Net.Handlers
                                                 MessageId = requestMessageNfo.MessageId,
                                                 BodyContentType = response?.Content?.Headers?.ContentType?.ToString() ?? string.Empty,
                                                 IsEncrypted = context.Request.IsHttps,
-                                                Headers = response.ExportAllHeaders(),
+                                                Headers = responseHeaders,
                                                 MessageProtocol = MessageProtocol.Http,
                                                 HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
                                                 StatusCode = response.StatusCode,
@@ -553,7 +553,7 @@ namespace CitadelCore.Net.Handlers
                                         MessageId = requestMessageNfo.MessageId,
                                         BodyContentType = response?.Content?.Headers?.ContentType?.ToString() ?? string.Empty,
                                         IsEncrypted = context.Request.IsHttps,
-                                        Headers = response.ExportAllHeaders(),
+                                        Headers = responseHeaders,
                                         MessageProtocol = MessageProtocol.Http,
                                         StatusCode = response.StatusCode,
                                         HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
@@ -590,7 +590,7 @@ namespace CitadelCore.Net.Handlers
                                         MessageId = requestMessageNfo.MessageId,
                                         BodyContentType = response?.Content?.Headers?.ContentType?.ToString() ?? string.Empty,
                                         IsEncrypted = context.Request.IsHttps,
-                                        Headers = response.ExportAllHeaders(),
+                                        Headers = responseHeaders,
                                         MessageProtocol = MessageProtocol.Http,
                                         StatusCode = response.StatusCode,
                                         HttpVersion = upstreamReqVersionMatch ?? new Version(1, 0),
@@ -652,7 +652,7 @@ namespace CitadelCore.Net.Handlers
                     using (var responseStream = await response?.Content.ReadAsStreamAsync())
                     {
                         context.Response.StatusCode = (int)response.StatusCode;
-                        context.Response.PopulateHeaders(response.ExportAllHeaders(), s_emptyExemptedHeaders);
+                        context.Response.PopulateHeaders(responseHeaders, s_emptyExemptedHeaders);
 
                         if (!responseHasZeroContentLength && (upstreamIsHttp1 || responseIsFixedLength))
                         {
